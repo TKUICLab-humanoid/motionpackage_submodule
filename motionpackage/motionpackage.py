@@ -39,7 +39,7 @@ ADDR_PRO_X_PROFILE_VELOCITY = 116
 LEN_PRO_GOAL_POSITION       = 8
 PROTOCOL_VERSION            = 2
 DXL_HAND_IDS                = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
-DXL_HEAD_IDS                = [28, 29]
+DXL_HEAD_IDS                = [28, 29,15]
 TORQUE_ENABLE               = 1
 TORQUE_DISABLE              = 0
 
@@ -105,6 +105,7 @@ class Motionpackage(Node):
         self.SingleMotor_sub
         self.robotislist = []
         self.robotislistH = []
+        self.robotislistW = []
         self.serial_init()
         self.start_imu_thread()
         self.standini()
@@ -133,16 +134,6 @@ class Motionpackage(Node):
         self.pre_dio_strategy = False
         self.prev_pin22_val = None
         self.lines = []
-
-        # self.port_handler   = PortHandler("/dev/ttyUSB0")
-        # self.packet_handler = PacketHandler(PROTOCOL_VERSION)
-        # self.groupwrite     = GroupSyncWrite(
-        #     self.port_handler,
-        #     self.packet_handler,
-        #     ADDR_PRO_GOAL_POSITION,
-        #     LEN_PRO_GOAL_POSITION
-        # )
-
 
     ######################         walking      ###############################
     def location_callback(self, loc):
@@ -378,12 +369,16 @@ class Motionpackage(Node):
     def RobotisListinit(self):
         self.robotislist.clear()
         self.robotislistH.clear()
+        self.robotislistW.clear()
         for i in range(1, 16):
             motor = Motor(ID=i, position=2048, speed=511)
             self.robotislistH.append(motor)
+        motor = Motor(ID=15, position=2048, speed=511)
+        self.robotislistW.append(motor)
         for i in range(28, 30):
             motor = Motor(ID=i, position=2048, speed=511)
             self.robotislist.append(motor)
+        
         # self.get_logger().info(f"hand {list(self.robotislistH)},head {list(self.robotislist)}")
 
     def HeadMotorFunction(self, msg):
@@ -396,8 +391,8 @@ class Motionpackage(Node):
 
         # 2. 確保每顆馬達 torque 已打開
         for m in self.robotislist:
-            res, err = self.packet_handler.write1ByteTxRx(
-                self.port_handler,
+            res, err = self.packet_handler_1.write1ByteTxRx(
+                self.port_handler_1,
                 m.ID,
                 ADDR_PRO_TORQUE_ENABLE,
                 TORQUE_ENABLE
@@ -410,7 +405,7 @@ class Motionpackage(Node):
                 pass
 
         # 3. 清空上一次的群組參數
-        self.groupwrite.clearParam()
+        self.groupwrite_1.clearParam()
 
         # 4. 打包並加入速度＋位置
         for m in self.robotislist:
@@ -420,16 +415,17 @@ class Motionpackage(Node):
             # Goal Position (addr=116–119)
             param.extend(m.position.to_bytes(4, 'little', signed=True))
 
-            ok = self.groupwrite.addParam(m.ID, param)
+            ok = self.groupwrite_1.addParam(m.ID, param)
             if not ok:
                 # self.get_logger().error(
                 #     f"[ID:{m.ID}] addParam failed (len={len(param)})"
                 # )
                 pass
 
-        sent = self.groupwrite.txPacket()
+        sent = self.groupwrite_1.txPacket()
         self.get_logger().info(f"Get : {self.robotislist}")
-        self.groupwrite.clearParam()
+        self.groupwrite_1.clearParam()
+        
 
     def serial_init(self):
         self.get_logger().debug(f"Begin serial ini")
@@ -521,6 +517,57 @@ class Motionpackage(Node):
             self.port_handler    = None
             self.packet_handler  = None
             self.groupwrite      = None
+
+
+        self.port_waist_dev = '/dev/ttyUSB1'
+        self.baudrate_head = 1_000_000
+        try:
+            self.get_logger().debug(
+                f"Opening HEAD dynamixel port: {self.port_waist_dev}"
+            )
+
+            # 1) 建 PortHandler & PacketHandler
+            self.port_handler_1   = PortHandler(self.port_waist_dev)
+            self.packet_handler_1 = PacketHandler(PROTOCOL_VERSION)
+
+            # 2) openPort & setBaudRate
+            if not self.port_handler_1.openPort():
+                raise RuntimeError(f"Failed to open port {self.port_waist_dev}")
+            if not self.port_handler_1.setBaudRate(self.baudrate_head):
+                raise RuntimeError(f"Failed to set baudrate {self.baudrate_head}")
+
+            # 3) 建 GroupSyncWrite：從 address 112 (Profile Velocity) 開始，
+            #    長度 8 bytes (4 bytes velocity + 4 bytes position)
+            self.groupwrite_1 = GroupSyncWrite(
+                self.port_handler_1,
+                self.packet_handler_1,
+                112,  # 112
+                8
+            )
+
+            self.get_logger().debug(f"[OK] Dynamixel on {self.port_waist_dev}")
+
+            # 4) 預先 enable torque
+            for dxl_id in DXL_HEAD_IDS:
+                res, err = self.packet_handler_1.write1ByteTxRx(
+                    self.port_handler_1,
+                    dxl_id,
+                    ADDR_PRO_TORQUE_ENABLE,
+                    TORQUE_ENABLE
+                )
+                if res != COMM_SUCCESS:
+                    # self.get_logger().error(
+                    #     f"[ID:{dxl_id}] Enable torque failed: "
+                    #     f"{self.packet_handler.getTxRxResult(res)}"
+                    # )
+                    pass
+
+        except Exception as e:
+            self.get_logger().error(f"[Dynamixel ERROR] {e}")
+            # 如果開 port 失敗，就把 handler 設 None，後面要記得檢查
+            self.port_handler_1    = None
+            self.packet_handler_1  = None
+            self.groupwrite_1      = None
 
     def start_imu_thread(self):
         self.imu_thread = threading.Thread(target=self.imu_port, daemon=True)
@@ -638,6 +685,53 @@ class Motionpackage(Node):
         # self.get_logger().info(f"Get : {self.robotislistH}")
         self.groupwrite.clearParam()
 
+    def send_waist(self,msg):
+        # 1. 更新本地的 robotislist
+        # for idx in range(15):
+        speed, position = msg[14]
+        motor = self.robotislistW[0]
+        updated_motor = Motor(
+            ID=motor.ID,
+            position=position,
+            speed=speed
+        )
+        self.robotislistW[0] = updated_motor
+        # 2. 確保每顆馬達 torque 已打開
+        for m in self.robotislistW:
+            res, err = self.packet_handler_1.write1ByteTxRx(
+                self.port_handler_1,
+                m.ID,
+                ADDR_PRO_TORQUE_ENABLE,
+                TORQUE_ENABLE
+            )
+            if res != COMM_SUCCESS:
+                # self.get_logger().error(
+                #     f"[ID:{m.ID}] Enable torque failed: "
+                #     f"{self.packet_handler_1.getTxRxResult(res)}"
+                # )
+                pass
+
+        # 3. 清空上一次的群組參數
+        self.groupwrite_1.clearParam()
+
+        # 4. 打包並加入速度＋位置
+        for m in self.robotislistW:
+            param = bytearray()
+            # Profile Velocity (addr=112–115)
+            param.extend(m.speed.to_bytes(4, 'little', signed=False))
+            # Goal Position (addr=116–119)
+            param.extend(m.position.to_bytes(4, 'little', signed=True))
+
+            ok = self.groupwrite_1.addParam(m.ID, param)
+            if not ok:
+                self.get_logger().error(
+                    f"[ID:{m.ID}] addParam failed (len={len(param)})"
+                )
+
+        sent = self.groupwrite_1.txPacket()
+        # self.get_logger().info(f"Get : {self.robotislistH}")
+        self.groupwrite_1.clearParam()
+
     def standini(self):
         self.RobotisListinit()
         self.get_logger().info(f"Standini")
@@ -675,6 +769,7 @@ class Motionpackage(Node):
             written = ser.write(buf)
             ser.flush()
             self.send_hand(handpkg)
+            self.send_waist(handpkg)
             # self.get_logger().info(f"[OpenCR] Sent {written} bytes: {list(buf)}")
             acks = []
             while True:
@@ -795,7 +890,7 @@ class Motionpackage(Node):
         try:
             with open(now_path, "w") as f:
                 toml.dump(data, f)
-            self.get_logger().debug(
+            self.get_logger().info(
                 f"更新完成 → ID={msg.id} | "
                 f"speed16={msg.speed}, pos16+={msg.position}→{new_p16} | "
                 f"speed32={list(speed_bytes)}, pos32+={msg.position}→{new_pos32}"
@@ -803,36 +898,38 @@ class Motionpackage(Node):
         except Exception as e:
             self.get_logger().error(f"寫回 now_motion.toml 失敗: {e}")
             return
-
+        # self.get_logger().info(f"Package16 = {pkg16}")
+        handpkg,pkg16 = self.load_packets_from_toml()
+        self.send_waist(handpkg)
         # 5. 重建要送出的 buf（同 standini）
         payload_vals = pkg16[1:-1]            # 跳過 242 header 與最後的 footer
         buf = bytearray([242])
-        for v in payload_vals:
-            vv = v & 0xFFFFFFFF
-            # 低 16 bit
-            buf.extend((vv & 0xFFFF).to_bytes(2, 'little', signed=False))
-            # 高 16 bit
-            buf.extend(((vv >> 16) & 0xFFFF).to_bytes(2, 'little', signed=False))
+        # for v in payload_vals:
+        #     vv = v & 0xFFFFFFFF
+        #     # 低 16 bit
+        #     buf.extend((vv & 0xFFFF).to_bytes(2, 'little', signed=False))
+        #     # 高 16 bit
+        #     buf.extend(((vv >> 16) & 0xFFFF).to_bytes(2, 'little', signed=False))
 
-        # 6. 發送給 OpenCR
-        try:
-            ser = self.serial_walk
-            ser.reset_input_buffer()
-            ser.timeout = 0.1
-            written = ser.write(buf)
-            ser.flush()
-            self.get_logger().info(f"[OpenCR] Sent {written} bytes: {list(buf)}")
-            # 讀 ack
-            acks = []
-            while True:
-                line = ser.readline().decode(errors='ignore').strip()
-                if not line:
-                    break
-                acks.append(line)
-            self.get_logger().info(f"move_single_motor_ack: {acks}")
-        except EnvironmentError as e:
-            self.get_logger().error(f"Serial write error: {e}")
-            return
+        # # 6. 發送給 OpenCR
+        # try:
+        #     ser = self.serial_walk
+        #     ser.reset_input_buffer()
+        #     ser.timeout = 0.1
+        #     written = ser.write(buf)
+        #     ser.flush()
+        #     self.get_logger().info(f"[OpenCR] Sent {written} bytes: {list(buf)}")
+        #     # 讀 ack
+        #     acks = []
+        #     while True:
+        #         line = ser.readline().decode(errors='ignore').strip()
+        #         if not line:
+        #             break
+        #         acks.append(line)
+        #     self.get_logger().info(f"move_single_motor_ack: {acks}")
+        # except EnvironmentError as e:
+        #     self.get_logger().error(f"Serial write error: {e}")
+        #     return
 
     def dio(self):
         raw = [GPIO.input(p) for p in self.pins]
@@ -1271,6 +1368,7 @@ class Motionpackage(Node):
                     written = ser.write(buf)
                     ser.flush()
                     self.send_hand(handpkg)
+                    self.send_waist(handpkg)
                     self.get_logger().debug(f"[OpenCR] Sent {written} bytes: {list(buf)}")
                     acks = []
                     while True:
@@ -1305,6 +1403,7 @@ class Motionpackage(Node):
             written = ser.write(buf)
             ser.flush()
             self.send_hand(handpkg)
+            self.send_waist(handpkg)
             self.get_logger().debug(f"[OpenCR] Sent {written} bytes: {list(buf)}")
             acks = []
             while True:
