@@ -39,7 +39,7 @@ static void mcssl_callback(int id, uint8_t *buf, int length)
 {
     static int dio_tmpstatus = 0;
     static bool walkdata_receive = false;
-    printf("FPGAack is :%x %x %x %x\n",buf[0],buf[1],buf[2],buf[3]);
+    printf("FPGAack is :%x %x %x %x \n",buf[0],buf[1],buf[2],buf[3]);
     for(int i = 0; i < 4; i++)
     {
         switch (dio_tmpstatus) {
@@ -1438,7 +1438,7 @@ void Sensor_Data_Process()
         Sensor_Data_tmp[i] = ((sensor_data_buf[Sensor_Data_Count++] << 8) | (sensor_data_buf[Sensor_Data_Count++]));
         if(Sensor_Data_tmp[i] & 0x8000) //negative
         {
-            IMU_Value[i] = (double)((Sensor_Data_tmp[i] & 0x7FFF) * (-1)) / 100.0;
+            IMU_Value[i] = (double)( ~(Sensor_Data_tmp[i] & 0x7FFF) + 1) / 100.0;
         }
         else                            //positive
         {
@@ -1524,13 +1524,13 @@ void SensorSetFunction(const tku_msgs::SensorSet &msg)
         Desire_Pitch = msg.Pitch;
         Desire_Yaw = msg.Yaw;
     }
-    if(Gain_Set == true)
+    /*if(Gain_Set == true)
     {
         Gain_Roll = msg.GainRoll;
         Gain_Pitch = msg.GainPitch;
         Gain_KP = msg.GainKP;
         Gain_KD = msg.GainKD;
-    }
+    }*/
 
     sensorsetpackage[0] = 0x53;
     sensorsetpackage[1] = 0x54;
@@ -1577,56 +1577,7 @@ void SensorSetFunction(const tku_msgs::SensorSet &msg)
     
     sensorsetpackage[10] = 0;    //Reserve
 
-    if(Gain_Roll < 0)
-    {
-        Gain_Roll = ~(Gain_Roll) + 1;
-        sensorsetpackage[11] = ((Gain_Roll >> 8) & 0xFF) | 0x80;
-        sensorsetpackage[12] = Gain_Roll & 0xFF;
-        Gain_Roll = ~(Gain_Roll - 1);
-    }
-    else
-    {
-        sensorsetpackage[11] = (Gain_Roll >> 8) & 0xFF;
-        sensorsetpackage[12] = Gain_Roll & 0xFF;
-    }
-    if(Gain_Pitch < 0)
-    {
-        Gain_Pitch = ~(Gain_Pitch) + 1;
-        sensorsetpackage[13] = ((Gain_Pitch >> 8) & 0xFF) | 0x80;
-        sensorsetpackage[14] = Gain_Pitch & 0xFF;
-        Gain_Pitch = ~(Gain_Pitch - 1);
-    }
-    else
-    {
-        sensorsetpackage[13] = (Gain_Pitch >> 8) & 0xFF;
-        sensorsetpackage[14] = Gain_Pitch & 0xFF;
-    }
-    if(Gain_KP < 0)
-    {
-        Gain_KP = ~(Gain_KP) + 1;
-        sensorsetpackage[15] = ((Gain_KP >> 8) & 0xFF) | 0x80;
-        sensorsetpackage[16] = Gain_KP & 0xFF;
-        Gain_KP = ~(Gain_KP - 1);
-    }
-    else
-    {
-        sensorsetpackage[15] = (Gain_KP >> 8) & 0xFF;
-        sensorsetpackage[16] = Gain_KP & 0xFF;
-    }
-    if(Gain_KD < 0)
-    {
-        Gain_KD = ~(Gain_KD) + 1;
-        sensorsetpackage[17] = ((Gain_KD >> 8) & 0xFF) | 0x80;
-        sensorsetpackage[18] = Gain_KD & 0xFF;
-        Gain_KD = ~(Gain_KD - 1);
-    }
-    else
-    {
-        sensorsetpackage[17] = (Gain_KD >> 8) & 0xFF;
-        sensorsetpackage[18] = Gain_KD & 0xFF;
-    }
-
-    sensorsetpackage[19] = 0x45;
+    sensorsetpackage[11] = 0x45;
 
     tool->Delay(10);
     cssl_putdata(serial_IMU, sensorsetpackage, SENSOR_SET_PACKAGE_SIZE);
@@ -1685,56 +1636,8 @@ void AutoSensorSetFunction()
     
     sensorsetpackage[10] = 0;    //Reserve
 
-    if(Gain_Roll < 0)
-    {
-        Gain_Roll = ~(Gain_Roll) + 1;
-        sensorsetpackage[11] = ((Gain_Roll >> 8) & 0xFF) | 0x80;
-        sensorsetpackage[12] = Gain_Roll & 0xFF;
-        Gain_Roll = ~(Gain_Roll - 1);
-    }
-    else
-    {
-        sensorsetpackage[11] = (Gain_Roll >> 8) & 0xFF;
-        sensorsetpackage[12] = Gain_Roll & 0xFF;
-    }
-    if(Gain_Pitch < 0)
-    {
-        Gain_Pitch = ~(Gain_Pitch) + 1;
-        sensorsetpackage[13] = ((Gain_Pitch >> 8) & 0xFF) | 0x80;
-        sensorsetpackage[14] = Gain_Pitch & 0xFF;
-        Gain_Pitch = ~(Gain_Pitch - 1);
-    }
-    else
-    {
-        sensorsetpackage[13] = (Gain_Pitch >> 8) & 0xFF;
-        sensorsetpackage[14] = Gain_Pitch & 0xFF;
-    }
-    if(Gain_KP < 0)
-    {
-        Gain_KP = ~(Gain_KP) + 1;
-        sensorsetpackage[15] = ((Gain_KP >> 8) & 0xFF) | 0x80;
-        sensorsetpackage[16] = Gain_KP & 0xFF;
-        Gain_KP = ~(Gain_KP - 1);
-    }
-    else
-    {
-        sensorsetpackage[15] = (Gain_KP >> 8) & 0xFF;
-        sensorsetpackage[16] = Gain_KP & 0xFF;
-    }
-    if(Gain_KD < 0)
-    {
-        Gain_KD = ~(Gain_KD) + 1;
-        sensorsetpackage[17] = ((Gain_KD >> 8) & 0xFF) | 0x80;
-        sensorsetpackage[18] = Gain_KD & 0xFF;
-        Gain_KD = ~(Gain_KD - 1);
-    }
-    else
-    {
-        sensorsetpackage[17] = (Gain_KD >> 8) & 0xFF;
-        sensorsetpackage[18] = Gain_KD & 0xFF;
-    }
 
-    sensorsetpackage[19] = 0x45;
+    sensorsetpackage[11] = 0x45;
 
     if(timer_sensor_set.checkTimePass())
     {
