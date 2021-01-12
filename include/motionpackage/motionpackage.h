@@ -55,7 +55,7 @@ typedef struct
 #define offset3 46
 #define offset4 61
 // #define SENSOR_BUF_SIZE 60
-#define SENSOR_SET_PACKAGE_SIZE 20
+#define SENSOR_SET_PACKAGE_SIZE 12
 #define IMU_PACKAGE_SIZE 28
 
 using std::string;
@@ -108,10 +108,10 @@ bool old_fall_Down_Flag = false;
 int Desire_Roll = 0;
 int Desire_Pitch = 0;
 int Desire_Yaw = 0;
-int Gain_Roll = 0;
+/*int Gain_Roll = 0;
 int Gain_Pitch = 0;
 int Gain_KP = 0;
-int Gain_KD = 0;
+int Gain_KD = 0;*/
 
 void initparameterpath();
 string parameter_path = "N";
