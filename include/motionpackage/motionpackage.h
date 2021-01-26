@@ -28,6 +28,7 @@
 #include "tku_msgs/SaveMotionVector.h"
 #include "tku_msgs/SaveMotion.h"
 #include "tku_msgs/callback.h"
+#include "tku_msgs/CheckSector.h"
 #include "tku_msgs/ReadMotion.h"
 #include "tku_msgs/SensorPackage.h"
 #include "tku_msgs/SensorSet.h"
@@ -76,6 +77,7 @@ vector<unsigned int> SaveSectorPackage;
 vector<unsigned int> SendSectorPackage;
 vector<unsigned int> handspeedpackage;
 vector<unsigned char> IMUPackage;
+vector<int> CheckSectorPackage;
 tku_msgs::SaveMotionVector MotionSaveData;
 //std::string SendSectorPackage;
 vector<tsRobotis> RobotisList;

@@ -411,7 +411,7 @@ void paradata_send2fpga(int walking_mode, double y_swing, int period_t1, double 
     cssl_putdata(serial, parameterpackage, 31);
 }
 
-void parameterCallback (const tku_msgs::Parameter_message& msg)
+void parameterCallback(const tku_msgs::Parameter_message& msg)
 {
     int walking_mode, period_t1, period_t2, sample_time;
     double x_swing, y_swing, z_swing, lock_range;
@@ -1166,7 +1166,6 @@ bool InterfaceReadDataFunction(tku_msgs::ReadMotion::Request &Motion_req, tku_ms
 void InterfaceSend2SectorFunction(const tku_msgs::InterfaceSend2Sector &msg)
 {
     SaveSectorPackage.push_back(msg.Package);
-    int stamp = 0;
     int checksum_int = 0;
     int checksum_Lhand_int = 0;
     int checksum_Rhand_int = 0;
@@ -1176,7 +1175,6 @@ void InterfaceSend2SectorFunction(const tku_msgs::InterfaceSend2Sector &msg)
     uint8_t checksum_Rhand;
     uint8_t checksum_Lfoot;
     uint8_t checksum_Rfoot;
-    int count = 0;
     int len = SaveSectorPackage.size();
     if (SaveSectorPackage[0] == 0x53 && SaveSectorPackage[1] == 0x54 && SaveSectorPackage[len-2] == 0x4E && SaveSectorPackage[len-1] == 0x45)
     {
@@ -1297,6 +1295,120 @@ void InterfaceSend2SectorFunction(const tku_msgs::InterfaceSend2Sector &msg)
         printf("SaveSectorEnd\n");
         SaveSectorPackage.clear();
         OutFile.close();
+    }
+}
+
+bool InterfaceCheckSectorFunction(tku_msgs::CheckSector::Request &req, tku_msgs::CheckSector::Response &res)
+{
+    CheckSectorPackage.clear();
+    printf("CheckSectorStart\n");
+    char filename[10];
+    sprintf(filename,"%d",req.data);
+    char pathend[20] = "/sector/";
+    char pathend2[20] = ".ini";
+    char path[200];
+    int packagecnt;
+    int returnvalue;
+    bool motionlist_flag = true;
+    int cnt_tmp = 84;
+
+    if(req.data == 29)
+    {
+        strcpy(path, STANDPATH);
+        strcat(pathend, filename);
+        strcat(path, pathend);
+        strcat(path, pathend2);
+    }
+    else
+    {
+        strcpy(path, parameter_path.c_str());
+        strcat(pathend, filename);
+        strcat(path, pathend);
+        strcat(path, pathend2);
+    }
+    fstream fin;
+    fin.open(path, ios::in);
+    if(!fin)
+    {
+        printf("Filename Error!!\n");
+    }
+    else
+    {
+        packagecnt = tool->readvalue(fin, "PackageCnt", 0);
+        returnvalue = tool->readvalue(fin, "Package", 4);
+        if(returnvalue != -1)
+        {
+            CheckSectorPackage.push_back(returnvalue);
+        }
+        else
+        {
+            res.checkflag = false;
+            return true;
+        }
+        printf("mode = %d\n",CheckSectorPackage[0]);
+        for(int i = 1; i < packagecnt; i++)
+        {
+            returnvalue = tool->readvalue(fin, "|", 5);
+            if(returnvalue != -1)
+            {
+                CheckSectorPackage.push_back(returnvalue);
+            }
+            else
+            {
+                res.checkflag = false;
+                return true;
+            }
+        }
+        switch(CheckSectorPackage[0])
+        {
+            case 242:
+            case 243:
+                if(packagecnt != 85)
+                {
+                    printf("\033[0;31m242 243 Packagecnt is not correct!!\033[0m\n");
+                    res.checkflag = false;
+                    return true;
+                }
+                printf("Sector %d is correct!!\n",req.data);
+                printf("CheckSectorEnd\n");
+                res.checkflag = true;
+                return true;
+                break;
+            case 244:
+                while(motionlist_flag)
+                {
+                    if(cnt_tmp+5 > packagecnt)
+                    {
+                        printf("\033[0;31m244 count of Package is not the same as Packagecnt!!\033[0m\n");
+                        res.checkflag = false;
+                        return true;
+                    }
+                    if(CheckSectorPackage[cnt_tmp+1] == 68 && CheckSectorPackage[cnt_tmp+2] == 89)
+                    {
+                        if(CheckSectorPackage[cnt_tmp+4] == 69 && CheckSectorPackage[cnt_tmp+5] == 78)
+                        {
+                            motionlist_flag = false;
+                        }
+                        cnt_tmp += 87;
+                    }
+                    else
+                    {
+                        printf("\033[0;31m244 Package have not 68 89!!\033[0m\n");
+                        res.checkflag = false;
+                        return true;
+                    }
+                }
+                printf("Sector %d is correct!!\n",req.data);
+                printf("CheckSectorEnd\n");
+                res.checkflag = true;
+                return true;
+                break;
+            default:
+                printf("\033[0;31m%d is not correct mode!!\033[0m\n",SendSectorPackage[0]);
+                res.checkflag = false;
+                return true;
+                break;
+        }
     }
 }
 
@@ -1671,6 +1783,7 @@ int main(int argc, char **argv)
     ros::Subscriber parameter_sub = nh.subscribe("/package/parameterdata", 1000, parameterCallback);
     ros::Subscriber motion_sub = nh.subscribe("/package/walkingdata", 1000, motionCallback);
     ros::ServiceServer InterfaceReadData_service = nh.advertiseService("/package/InterfaceReadSaveMotion",InterfaceReadDataFunction);
+    ros::ServiceServer InterfaceCheckSector_service = nh.advertiseService("/package/InterfaceCheckSector",InterfaceCheckSectorFunction);
     
     ros::Subscriber headmotor_subscribe = nh.subscribe("/package/HeadMotor", 1000, HeadMotorFunction);
     ros::Subscriber SectorSend2FPGA_subscribe = nh.subscribe("/package/Sector", 1000, SectorSend2FPGAFunction);
