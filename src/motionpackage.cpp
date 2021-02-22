@@ -6,6 +6,43 @@ static void head_callback(int id, uint8_t *buf, int length)
 
 }
 
+void handtest(const tku_msgs::PointData &msg)
+{
+
+    short temppos[3] = {0};
+
+    temppos[0] = (short)(msg.x *100);
+    temppos[1] = (short)(msg.y *100);
+    temppos[2] = (short)(msg.z *100);
+
+    for(int i = 0; i < 3; i++)
+    {
+        if(temppos[i] < 0)
+        {
+            temppos[i] = (~abs(temppos[i]))+1;
+        }    
+    }
+
+    test_hand[0] = 0x53;
+    test_hand[1] = 0x54;
+    test_hand[2] = 0xF1;
+    test_hand[3] = (temppos[0] >> 8) & 0xFF;
+    test_hand[4] = temppos[0] & 0xFF;
+    test_hand[5] = (temppos[1] >> 8) & 0xFF;
+    test_hand[6] = temppos[1] & 0xFF;
+    test_hand[7] = (temppos[2] >> 8) & 0xFF;
+    test_hand[8] = temppos[2] & 0xFF;
+    test_hand[9] = 0xFF;
+    test_hand[10] = 0xFF;
+    test_hand[11] = 0x45;
+
+    cssl_putdata(serial, test_hand, 12);
+    
+    printf("x = %x %x,y = %x %x, z = %x %x\n",test_hand[3],test_hand[4],test_hand[5],test_hand[6],test_hand[7],test_hand[8]);
+
+}
+
+
 static void IMU_callback(int id, uint8_t *buf, int length)
 {
     bool got_imu_package_flag = false;
@@ -1773,6 +1810,9 @@ void initparameterpath()
 int main(int argc, char **argv)
 {
 	//Initial
+
+
+
 	initparameterpath();
     RobotisListini();
     packageinit();
@@ -1792,6 +1832,7 @@ int main(int argc, char **argv)
     ros::Subscriber InterfaceSend2Sector = nh.subscribe("/package/InterfaceSend2Sector", 1000, InterfaceSend2SectorFunction);
     ros::Subscriber InterfaceSaveData_Subscribe = nh.subscribe("/package/InterfaceSaveMotion", 1000, InterfaceSaveDataFunction);
     ros::Subscriber SensorSet_Subscribe = nh.subscribe("/sensorset", 100, SensorSetFunction);
+    ros::Subscriber Hand_Subscribe = nh.subscribe("/package/EndPoint", 1000, handtest);
     
     FPGAack_Publish = nh.advertise<std_msgs::Int16>("/package/FPGAack", 1000);
     walkack_Publish = nh.advertise<std_msgs::Bool>("/package/walkack", 1000);

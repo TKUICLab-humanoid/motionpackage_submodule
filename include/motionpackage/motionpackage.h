@@ -32,6 +32,7 @@
 #include "tku_msgs/ReadMotion.h"
 #include "tku_msgs/SensorPackage.h"
 #include "tku_msgs/SensorSet.h"
+#include "tku_msgs/PointData.h"
 
 //---save
 #include <iostream>
@@ -84,6 +85,9 @@ vector<tsRobotis> RobotisList;
 TimeClass timer_sensor_set(10);
 struct timeval tstart, tend;
 double timeuse;
+
+uint8_t test_hand[12] = {0};
+
 uint8_t parameterpackage[31] = {0};
 uint8_t motorpackage[19] = {0};
 uint8_t HeadPackage[32] = {0};
@@ -116,6 +120,9 @@ int Gain_KP = 0;
 int Gain_KD = 0;*/
 
 void initparameterpath();
+
+//void handtest();
+
 string parameter_path = "N";
 
 int read_IMU_count = 0;
