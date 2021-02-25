@@ -11,15 +11,16 @@ void handtest(const tku_msgs::PointData &msg)
 
     short temppos[3] = {0};
 
-    temppos[0] = (short)(msg.x *100);
-    temppos[1] = (short)(msg.y *100);
-    temppos[2] = (short)(msg.z *100);
+    temppos[0] = (short)(msg.x);
+    temppos[1] = (short)(msg.y);
+    temppos[2] = (short)(msg.z);
 
     for(int i = 0; i < 3; i++)
     {
         if(temppos[i] < 0)
         {
-            temppos[i] = (~abs(temppos[i]))+1;
+            temppos[i] = abs(temppos[i]);
+            temppos[i] |= 0x8000;
         }    
     }
 
@@ -37,6 +38,11 @@ void handtest(const tku_msgs::PointData &msg)
     test_hand[11] = 0x45;
 
     cssl_putdata(serial, test_hand, 12);
+
+    for(int j =0; j<12;j++)
+    {
+        printf("package %d = %x\n",j , test_hand[j]);
+    }
     
     printf("x = %x %x,y = %x %x, z = %x %x\n",test_hand[3],test_hand[4],test_hand[5],test_hand[6],test_hand[7],test_hand[8]);
 
@@ -137,15 +143,15 @@ int mcssl_init()
     char *devs_IMU;
     cssl_start();
     if (!serial){
-        devs="/dev/ttyUSB0";
+        devs="/dev/ttyUSB1";
         serial=cssl_open(devs, mcssl_callback, 0, 115200, 8, 0, 1);
     }
     if (!serial_head){
-        devs_head="/dev/ttyS1";
+        devs_head="/dev/ttyUSB2";
         serial_head=cssl_open(devs_head, head_callback, 0, 115200, 8, 0, 1);
     }
     if (!serial_IMU){
-        devs_IMU="/dev/ttyS0";
+        devs_IMU="/dev/ttyUSB0";
         serial_IMU=cssl_open(devs_IMU, IMU_callback, 0, 115200, 8, 0, 1);
     }
     printf("Initialize Motion with port=%s...\n",devs);
