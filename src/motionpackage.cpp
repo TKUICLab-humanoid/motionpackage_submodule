@@ -93,40 +93,56 @@ static void mcssl_callback(int id, uint8_t *buf, int length)
         }
     }
 }
+
 int mcssl_init()
 {
     char *devs;
     char *devs_head;
     char *devs_IMU;
     cssl_start();
-    if (!serial){
+    if(tool->standPath == "/home/iclab/Desktop/Standmotion")
+    {
         devs="/dev/ttyUSB0";
+        devs_head="/dev/ttyS1";
+        devs_IMU="/dev/ttyS0";
+    }
+    else
+    {
+        devs="/dev/ttyUSB1";
+        devs_head="/dev/ttyUSB2";
+        devs_IMU="/dev/ttyUSB0";
+    }
+    if (!serial)
+    {
         serial=cssl_open(devs, mcssl_callback, 0, 115200, 8, 0, 1);
     }
-    if (!serial_head){
-        devs_head="/dev/ttyS1";
+    if (!serial_head)
+    {
         serial_head=cssl_open(devs_head, head_callback, 0, 115200, 8, 0, 1);
     }
-    if (!serial_IMU){
-        devs_IMU="/dev/ttyS0";
+    if (!serial_IMU)
+    {
         serial_IMU=cssl_open(devs_IMU, IMU_callback, 0, 115200, 8, 0, 1);
     }
     printf("Initialize Motion with port=%s...\n",devs);
     printf("Initialize Head with port=%s...\n",devs_head);
     printf("Initialize IMU with port=%s...\n",devs_IMU);
-    if (!serial){
+    if (!serial)
+    {
         printf("%s\n",cssl_geterrormsg());
         printf("---> Motion RS232 OPEN FAIL <---\n");
         fflush(stdout);
         return -1;
     }
-    if (!serial_head){
+    if (!serial_head)
+    {
         printf("%s\n",cssl_geterrormsg());
         printf("---> Head RS232 OPEN FAIL <---\n");
         fflush(stdout);
         return -1;
     }
-    if (!serial_IMU){
+    if (!serial_IMU)
+    {
         printf("%s\n",cssl_geterrormsg());
         printf("---> Head RS232 OPEN FAIL <---\n");
         fflush(stdout);
@@ -137,7 +153,9 @@ int mcssl_init()
     cssl_setflowcontrol(serial_IMU, 0, 0);
     return 1;
 }
-void mcssl_finish(){
+
+void mcssl_finish()
+{
 
     cssl_close(serial);
     cssl_close(serial_head);
@@ -145,7 +163,6 @@ void mcssl_finish(){
     cssl_stop();
 }
 //------------------------
-
 
 void packageinit()
 {
@@ -648,7 +665,7 @@ void Standini()
     char path[200];
     int packagecnt;
     int cnt = 3;
-    strcpy(path, STANDPATH);
+    strcpy(path, tool->standPath);
     strcat(path, pathend);
     strcat(path, pathend2);
     fstream fin;
@@ -701,14 +718,14 @@ void SectorSend2FPGAFunction(const std_msgs::Int16 &msg)
     int cnt = 3;
     if(msg.data == 29)
     {
-        strcpy(path, STANDPATH);
+        strcpy(path, tool->standPath);
         strcat(pathend, filename);
         strcat(path, pathend);
         strcat(path, pathend2);
     }
     else
     {
-        strcpy(path, parameter_path.c_str());
+        strcpy(path, tool->parameterPath.c_str());
         strcat(pathend, filename);
         strcat(path, pathend);
         strcat(path, pathend2);
@@ -857,13 +874,13 @@ void InterfaceSaveDataFunction(const tku_msgs::SaveMotion &msg)
         char path[200];
         if(msg.savestate == 1)
         {
-            strcpy(path, STANDPATH);
+            strcpy(path, tool->standPath);
             strcat(pathend, filename.c_str());
             strcat(path, pathend);
         }
         else
         {
-            strcpy(path, parameter_path.c_str());
+            strcpy(path, tool->parameterPath.c_str());
             strcat(pathend, filename.c_str());
             strcat(path, pathend);
         }
@@ -1027,13 +1044,13 @@ bool InterfaceReadDataFunction(tku_msgs::ReadMotion::Request &Motion_req, tku_ms
     int num;
     if(Motion_req.readstate == 1)
     {
-        strcpy(path, STANDPATH);
+        strcpy(path, tool->standPath);
         strcat(pathend, filename.c_str());
         strcat(path, pathend);
     }
     else
     {
-        strcpy(path, parameter_path.c_str());
+        strcpy(path, tool->parameterPath.c_str());
         strcat(pathend, filename.c_str());
         strcat(path, pathend);
     }
@@ -1184,14 +1201,14 @@ void InterfaceSend2SectorFunction(const tku_msgs::InterfaceSend2Sector &msg)
         string filename = msg.sectorname;
         if(filename == "29")
         {
-            strcpy(path, STANDPATH);
+            strcpy(path, tool->standPath);
             strcat(pathend, filename.c_str());
             strcat(path, pathend);
             strcat(path, pathend2);
         }
         else
         {
-            strcpy(path, parameter_path.c_str());
+            strcpy(path, tool->parameterPath.c_str());
             strcat(pathend, filename.c_str());
             strcat(path, pathend);
             strcat(path, pathend2);
@@ -1314,14 +1331,14 @@ bool InterfaceCheckSectorFunction(tku_msgs::CheckSector::Request &req, tku_msgs:
 
     if(req.data == 29)
     {
-        strcpy(path, STANDPATH);
+        strcpy(path, tool->standPath);
         strcat(pathend, filename);
         strcat(path, pathend);
         strcat(path, pathend2);
     }
     else
     {
-        strcpy(path, parameter_path.c_str());
+        strcpy(path, tool->parameterPath.c_str());
         strcat(pathend, filename);
         strcat(path, pathend);
         strcat(path, pathend2);
@@ -1424,7 +1441,7 @@ void MotorSpeedFunction(const tku_msgs::SandHandSpeed &msg)
     sprintf(filename,"%d",msg.sector);
     char pathend[20] = "/sector/";
     char pathend2[20] = ".ini";
-    strcpy(path, parameter_path.c_str());
+    strcpy(path, tool->parameterPath.c_str());
     strcat(pathend, filename);
     strcat(path, pathend);
     strcat(path, pathend2);
@@ -1758,22 +1775,12 @@ void AutoSensorSetFunction()
     }
 }
 
-void initparameterpath()
-{
-	while(parameter_path == "N")
-	{
-		parameter_path = tool->getPackagePath("strategy");
-	}
-	printf("parameter_path is %s\n", parameter_path.c_str());
-}
-
 /*==============================================================================*/
 //Main
 /*==============================================================================*/
 int main(int argc, char **argv)
 {
 	//Initial
-	initparameterpath();
     RobotisListini();
     packageinit();
 

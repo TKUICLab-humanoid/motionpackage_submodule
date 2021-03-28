@@ -115,9 +115,6 @@ int Gain_Pitch = 0;
 int Gain_KP = 0;
 int Gain_KD = 0;*/
 
-void initparameterpath();
-string parameter_path = "N";
-
 int read_IMU_count = 0;
 
 ToolInstance *tool = ToolInstance::getInstance();
