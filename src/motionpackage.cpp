@@ -100,7 +100,7 @@ int mcssl_init()
     char *devs_head;
     char *devs_IMU;
     cssl_start();
-    if(tool->standPath == "/home/iclab/Desktop/Standmotion")
+    if(!strcmp(tool->standPath, "/home/iclab/Desktop/Standmotion"))
     {
         devs="/dev/ttyUSB0";
         devs_head="/dev/ttyS1";
