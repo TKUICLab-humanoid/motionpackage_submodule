@@ -10,10 +10,12 @@ void handtest(const tku_msgs::PointData &msg)
 {
 
     short temppos[3] = {0};
-
+    
     temppos[0] = (short)(msg.x);
     temppos[1] = (short)(msg.y);
     temppos[2] = (short)(msg.z);
+
+    printf("x = %d,y = %d, z = %d\n",temppos[0],temppos[1],temppos[2]);
 
     for(int i = 0; i < 3; i++)
     {
