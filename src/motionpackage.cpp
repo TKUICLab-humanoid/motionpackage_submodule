@@ -15,6 +15,8 @@ void handtest(const tku_msgs::PointData &msg)
     temppos[1] = (short)(msg.y);
     temppos[2] = (short)(msg.z);
 
+    short tempstate = (short)msg.state;
+
     printf("x = %d,y = %d, z = %d\n",temppos[0],temppos[1],temppos[2]);
 
     for(int i = 0; i < 3; i++)
@@ -35,8 +37,8 @@ void handtest(const tku_msgs::PointData &msg)
     test_hand[6] = temppos[1] & 0xFF;
     test_hand[7] = (temppos[2] >> 8) & 0xFF;
     test_hand[8] = temppos[2] & 0xFF;
-    test_hand[9] = 0xFF;
-    test_hand[10] = 0xFF;
+    test_hand[9] = (tempstate >> 8) & 0xFF;
+    test_hand[10] = tempstate & 0xFF;
     test_hand[11] = 0x45;
 
     cssl_putdata(serial, test_hand, 12);
