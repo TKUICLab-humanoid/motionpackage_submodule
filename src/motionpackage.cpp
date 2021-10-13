@@ -180,7 +180,7 @@ void packageinit()
     motorpackage[18] = 0x45;
 }
 
-void paradata_send2fpga(int walking_mode, double x_swing, double y_swing, double z_swing, int period_t1, int period_t2, int sample_time, double lock_range, double base_default_z, double y_swing_shift, double x_swing_com, double base_lift_z)
+void paradata_send2fpga(int walking_mode, double x_swing, double y_swing, double z_swing, int period_t1, int period_t2, int sample_time, double lock_range, double base_default_z, double y_swing_shift, double x_swing_com, double base_lift_z, bool stand_balance)
 {
     uint8_t x_swing_h, x_swing_l, y_swing_h, y_swing_l, z_swing_h, z_swing_l;
     uint8_t period_t1_h, period_t1_l, period_t2_h, period_t2_l;
@@ -287,8 +287,7 @@ void paradata_send2fpga(int walking_mode, double x_swing, double y_swing, double
     parameterpackage[26] = walking_mode & 0xFF;
     parameterpackage[27] = 0;   //reserve
     parameterpackage[28] = 0;   //reserve
-    parameterpackage[29] = 0;   //reserve
-
+    parameterpackage[29] = stand_balance;   //reserve
     cssl_putdata(serial, parameterpackage, 31);
 }
 
@@ -434,6 +433,7 @@ void parameterCallback(const tku_msgs::Parameter_message& msg)
     double x_swing, y_swing, z_swing, lock_range;
     double x_swing_com, y_swing_shift, base_default_z, base_lift_z;
     double kick_point_x, kick_point_y, kick_point_z, back_point_x, back_point_z, support_foot_upper_hip_pitch, kick_foot_ankle_upper_pitch,support_foot_upper_ankle_pitch;
+    bool stand_balance;
 
     x_swing = msg.X_Swing_Range;
     y_swing = msg.Y_Swing_Range;
@@ -447,6 +447,7 @@ void parameterCallback(const tku_msgs::Parameter_message& msg)
     x_swing_com = msg.X_Swing_COM;
     base_lift_z = msg.BASE_LIFT_Z;
     walking_mode = msg.Walking_Mode;
+    stand_balance = msg.Stand_Balance;
     kick_point_x = msg.B_SplineParam.Kick_Point_X;
     kick_point_y = msg.B_SplineParam.Kick_Point_Y;
     kick_point_z = msg.B_SplineParam.Kick_Point_Z;
@@ -457,7 +458,7 @@ void parameterCallback(const tku_msgs::Parameter_message& msg)
     kick_foot_ankle_upper_pitch = msg.B_SplineParam.Kick_Foot_Ankle_Upper_Pitch;
     if(walking_mode != 9 && walking_mode != 10)
     {
-        paradata_send2fpga(walking_mode, x_swing,  y_swing,  z_swing,  period_t1,  period_t2, sample_time,  lock_range,  base_default_z,  y_swing_shift,  x_swing_com,  base_lift_z);
+        paradata_send2fpga(walking_mode, x_swing,  y_swing,  z_swing,  period_t1,  period_t2, sample_time,  lock_range,  base_default_z,  y_swing_shift,  x_swing_com,  base_lift_z, stand_balance);
     }
     else
     {
