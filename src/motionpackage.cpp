@@ -542,6 +542,7 @@ void motionCallback (const tku_msgs::Walking_message& msg)
     sensor_mode = msg.Sensor_Mode;
 
     walkingdata_send2fpga(x, y, z, theta, walking_cmd, sensor_mode);
+    tool->Delay(500);
 }
 //---head package---//
 void RobotisListini()
@@ -1643,72 +1644,104 @@ void Sensor_Data_Process()
 
 void SensorSetFunction(const tku_msgs::SensorSet &msg)
 {
-    bool Desire_Set = msg.DesireSet;
-    bool IMU_Reset = msg.IMUReset;
-    bool ForceState = msg.ForceState;
-    bool Gain_Set = msg.GainSet;
+    // bool Desire_Set = msg.DesireSet;
+    // bool IMU_Reset = msg.IMUReset;
+    // bool ForceState = msg.ForceState;
+    // bool Gain_Set = msg.GainSet;
+    // bool Roll_set = msg.Roll_set;
+    // bool Pitch_set = msg.Pitch_set;
+    // bool CoM_set = msg.CoM_set;
+    // bool Foot_Offset_set = msg.Foot_Offset_set;
+    int setopt = msg.sensor_modeset;
+    printf("setopt = %d\n", setopt);
+    int Desire_parameter[3];
+    printf("Roll = %d", msg.Roll);
 
-    if(Desire_Set == true)
+    // if(setopt & 0x08)
+    // {
+    //     Desire_Roll = msg.Roll;
+    //     Desire_Pitch = msg.Pitch;
+    //     Desire_Yaw = msg.Yaw;
+    // }
+    // if(Gain_Set == true)
+    // {
+    //     Gain_Roll = msg.GainRoll;
+    //     Gain_Pitch = msg.GainPitch;
+    //     Gain_KP = msg.GainKP;
+    //     Gain_KD = msg.GainKD;
+    // }
+    if(setopt & 0x08)
     {
-        Desire_Roll = msg.Roll;
-        Desire_Pitch = msg.Pitch;
-        Desire_Yaw = msg.Yaw;
+        Desire_parameter[0] = msg.Roll;
+        Desire_parameter[1] = msg.Pitch;
+        Desire_parameter[2] = 0;
     }
-    /*if(Gain_Set == true)
+    else if(setopt & 0x10 || setopt & 0x20 || setopt & 0x40)
     {
-        Gain_Roll = msg.GainRoll;
-        Gain_Pitch = msg.GainPitch;
-        Gain_KP = msg.GainKP;
-        Gain_KD = msg.GainKD;
-    }*/
+        Desire_parameter[0] = msg.sensor_P;
+        Desire_parameter[1] = msg.sensor_I;
+        Desire_parameter[2] = msg.sensor_D;
+    }
+    else if(setopt & 0x80)
+    {
+        Desire_parameter[0] = msg.sup_f;
+        Desire_parameter[1] = msg.nsup_f;
+        Desire_parameter[2] = 0;
+    }
+    else
+    {
+        Desire_parameter[0] = 0;
+        Desire_parameter[1] = 0;
+        Desire_parameter[2] = 0;
+    }
 
     sensorsetpackage[0] = 0x53;
     sensorsetpackage[1] = 0x54;
     sensorsetpackage[2] = 0xF6;
 
-    if(Desire_Roll < 0)
+    if(Desire_parameter[0] < 0)
     {
-        Desire_Roll = ~(Desire_Roll) + 1;
-        sensorsetpackage[3] = ((Desire_Roll >> 8) & 0xFF) | 0x80;
-        sensorsetpackage[4] = Desire_Roll & 0xFF;
-        Desire_Roll = ~(Desire_Roll - 1);
+        Desire_parameter[0] = ~(Desire_parameter[0]) + 1;
+        sensorsetpackage[3] = ((Desire_parameter[0] >> 8) & 0xFF) | 0x80;
+        sensorsetpackage[4] = Desire_parameter[0] & 0xFF;
+        Desire_parameter[0] = ~(Desire_parameter[0] - 1);
     }
     else
     {
-        sensorsetpackage[3] = (Desire_Roll >> 8) & 0xFF;
-        sensorsetpackage[4] = Desire_Roll & 0xFF;
+        sensorsetpackage[3] = (Desire_parameter[0] >> 8) & 0xFF;
+        sensorsetpackage[4] = Desire_parameter[0] & 0xFF;
     }
-    if(Desire_Pitch < 0)
+    if(Desire_parameter[1] < 0)
     {
-        Desire_Pitch = ~(Desire_Pitch) + 1;
-        sensorsetpackage[5] = ((Desire_Pitch >> 8) & 0xFF) | 0x80;
-        sensorsetpackage[6] = Desire_Pitch & 0xFF;
-        Desire_Pitch = ~(Desire_Pitch - 1);
+        Desire_parameter[1] = ~(Desire_parameter[1]) + 1;
+        sensorsetpackage[5] = ((Desire_parameter[1] >> 8) & 0xFF) | 0x80;
+        sensorsetpackage[6] = Desire_parameter[1] & 0xFF;
+        Desire_parameter[1] = ~(Desire_parameter[1] - 1);
     }
     else
     {
-        sensorsetpackage[5] = (Desire_Pitch >> 8) & 0xFF;
-        sensorsetpackage[6] = Desire_Pitch & 0xFF;
+        sensorsetpackage[5] = (Desire_parameter[1] >> 8) & 0xFF;
+        sensorsetpackage[6] = Desire_parameter[1] & 0xFF;
     }
-    if(Desire_Yaw < 0)
+    if(Desire_parameter[2] < 0)
     {
-        Desire_Yaw = ~(Desire_Yaw) + 1;
-        sensorsetpackage[7] = ((Desire_Yaw >> 8) & 0xFF) | 0x80;
-        sensorsetpackage[8] = Desire_Yaw & 0xFF;
-        Desire_Yaw = ~(Desire_Yaw - 1);
+        Desire_parameter[2] = ~(Desire_parameter[2]) + 1;
+        sensorsetpackage[7] = ((Desire_parameter[2] >> 8) & 0xFF) | 0x80;
+        sensorsetpackage[8] = Desire_parameter[2] & 0xFF;
+        Desire_parameter[2] = ~(Desire_parameter[2] - 1);
     }
     else
     {
-        sensorsetpackage[7] = (Desire_Yaw >> 8) & 0xFF;
-        sensorsetpackage[8] = Desire_Yaw & 0xFF;
+        sensorsetpackage[7] = (Desire_parameter[2] >> 8) & 0xFF;
+        sensorsetpackage[8] = Desire_parameter[2] & 0xFF;
     }
-
-    sensorsetpackage[9] = (Gain_Set << 3) | (ForceState << 2) | (IMU_Reset << 1) | Desire_Set;
-    
+    sensorsetpackage[9] = setopt;
+    printf("sensorsetpackage[3] = %d , %d\n", sensorsetpackage[3], sensorsetpackage[4]);
+    printf("Desire_parameter[0] = %d\n", Desire_parameter[0]);
+    printf("%x \n", setopt & 0x08);
+    // sensorsetpackage[9] = (Foot_Offset_set << 7) | (CoM_set << 6) | (Pitch_set << 5) | (Roll_set << 4) | (Gain_Set << 3) | (ForceState << 2) | (IMU_Reset << 1) | Desire_Set;
     sensorsetpackage[10] = 0;    //Reserve
-
     sensorsetpackage[11] = 0x45;
-
     tool->Delay(10);
     cssl_putdata(serial_IMU, sensorsetpackage, SENSOR_SET_PACKAGE_SIZE);
     timer_sensor_set.initialize();
