@@ -1653,9 +1653,7 @@ void SensorSetFunction(const tku_msgs::SensorSet &msg)
     // bool CoM_set = msg.CoM_set;
     // bool Foot_Offset_set = msg.Foot_Offset_set;
     int setopt = msg.sensor_modeset;
-    printf("setopt = %d\n", setopt);
     int Desire_parameter[3];
-    printf("Roll = %d", msg.Roll);
 
     // if(setopt & 0x08)
     // {
@@ -1736,9 +1734,6 @@ void SensorSetFunction(const tku_msgs::SensorSet &msg)
         sensorsetpackage[8] = Desire_parameter[2] & 0xFF;
     }
     sensorsetpackage[9] = setopt;
-    printf("sensorsetpackage[3] = %d , %d\n", sensorsetpackage[3], sensorsetpackage[4]);
-    printf("Desire_parameter[0] = %d\n", Desire_parameter[0]);
-    printf("%x \n", setopt & 0x08);
     // sensorsetpackage[9] = (Foot_Offset_set << 7) | (CoM_set << 6) | (Pitch_set << 5) | (Roll_set << 4) | (Gain_Set << 3) | (ForceState << 2) | (IMU_Reset << 1) | Desire_Set;
     sensorsetpackage[10] = 0;    //Reserve
     sensorsetpackage[11] = 0x45;
