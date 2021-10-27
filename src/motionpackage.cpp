@@ -542,7 +542,7 @@ void motionCallback (const tku_msgs::Walking_message& msg)
     sensor_mode = msg.Sensor_Mode;
 
     walkingdata_send2fpga(x, y, z, theta, walking_cmd, sensor_mode);
-    tool->Delay(500);
+    tool->Delay(50);
 }
 //---head package---//
 void RobotisListini()
@@ -1816,8 +1816,8 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "motionpackage");
 	ros::NodeHandle nh;
 
-    ros::Subscriber parameter_sub = nh.subscribe("/package/parameterdata", 1000, parameterCallback);
-    ros::Subscriber motion_sub = nh.subscribe("/package/walkingdata", 1000, motionCallback);
+    ros::Subscriber parameter_sub = nh.subscribe("/package/parameterdata", 1, parameterCallback);
+    ros::Subscriber motion_sub = nh.subscribe("/package/walkingdata", 1, motionCallback);
     ros::ServiceServer InterfaceReadData_service = nh.advertiseService("/package/InterfaceReadSaveMotion",InterfaceReadDataFunction);
     ros::ServiceServer InterfaceCheckSector_service = nh.advertiseService("/package/InterfaceCheckSector",InterfaceCheckSectorFunction);
     
