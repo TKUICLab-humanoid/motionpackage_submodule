@@ -39,6 +39,7 @@ static void mcssl_callback(int id, uint8_t *buf, int length)
 {
     static int dio_tmpstatus = 0;
     static bool walkdata_receive = false;
+    static bool footstep_receive = false;
     printf("FPGAack is :%x %x %x %x \n",buf[0],buf[1],buf[2],buf[3]);
     for(int i = 0; i < 4; i++)
     {
@@ -68,6 +69,12 @@ static void mcssl_callback(int id, uint8_t *buf, int length)
                     walkack.data = true;
                     walkack_Publish.publish(walkack);
                 }
+                if(footstep_receive)
+                {
+                    footstepack.data = true;
+                    footstepack_Publish.publish(footstepack);
+                    footstep_receive = false;
+                }
             }
             break;
         case 4:
@@ -80,6 +87,10 @@ static void mcssl_callback(int id, uint8_t *buf, int length)
                 InterfaceFlag = 0;
                 SendSectorPackage.clear();
             }
+            else if(buf[i] == 0xF8)
+            {
+                footstep_receive = true;
+            }
             else if(buf[i] == 0xF5)
             {
                 walkdata_receive = true;
@@ -87,6 +98,7 @@ static void mcssl_callback(int id, uint8_t *buf, int length)
             else
             {
                 walkdata_receive = false;
+                footstep_receive = false;
             }
             dio_tmpstatus = 3;
             break;
@@ -1831,6 +1843,7 @@ int main(int argc, char **argv)
     
     FPGAack_Publish = nh.advertise<std_msgs::Int16>("/package/FPGAack", 1000);
     walkack_Publish = nh.advertise<std_msgs::Bool>("/package/walkack", 1000);
+    footstepack_Publish = nh.advertise<std_msgs::Bool>("/package/footstepack", 1000);
     InterfaceCallBack_Publish = nh.advertise<std_msgs::Bool>("/package/motioncallback", 1000);
     ExecuteCallBack_Publish = nh.advertise<std_msgs::Bool>("/package/executecallback", 1000);
     Sensorpackage_Publish = nh.advertise<tku_msgs::SensorPackage>("/package/sensorpackage", 1000);

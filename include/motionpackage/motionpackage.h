@@ -66,10 +66,12 @@ cssl_t *serial_IMU;
 ros::Publisher FPGAack_Publish;
 ros::Publisher InterfaceCallBack_Publish;
 ros::Publisher walkack_Publish;
+ros::Publisher footstepack_Publish;
 ros::Publisher ExecuteCallBack_Publish;
 ros::Publisher Sensorpackage_Publish;
 
 std_msgs::Bool walkack;
+std_msgs::Bool footstepack;
 std_msgs::Bool interface_ack;
 std_msgs::Bool execute_ack;
 std_msgs::Int16 FPGAack;
