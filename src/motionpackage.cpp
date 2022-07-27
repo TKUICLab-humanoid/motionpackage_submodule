@@ -1684,7 +1684,7 @@ void SensorSetFunction(const tku_msgs::SensorSet &msg)
     {
         Desire_parameter[0] = msg.Roll;
         Desire_parameter[1] = msg.Pitch;
-        Desire_parameter[2] = 0;
+        Desire_parameter[2] = msg.Yaw;
     }
     else if(setopt & 0x10 || setopt & 0x20 || setopt & 0x40)
     {
