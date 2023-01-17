@@ -42,54 +42,55 @@ static void mcssl_callback(int id, uint8_t *buf, int length)
     printf("FPGAack is :%x %x %x %x \n",buf[0],buf[1],buf[2],buf[3]);
     for(int i = 0; i < 4; i++)
     {
-        switch (dio_tmpstatus) {
-        case 0:
-            if(buf[i] == 'S')
-                dio_tmpstatus = 1;
-            break;
-        case 1:
-            if(buf[i] == 'U')
-                dio_tmpstatus = 2;
+        switch (dio_tmpstatus) 
+        {
+            case 0:
+                if(buf[i] == 'S')
+                    dio_tmpstatus = 1;
+                break;
+            case 1:
+                if(buf[i] == 'U')
+                    dio_tmpstatus = 2;
 
-            if(buf[i] == 'T')
-                dio_tmpstatus = 4;
-            break;
-        case 2:
-            dio_tmpstatus = 3;
-            FPGAack.data = buf[i];
-            FPGAack_Publish.publish(FPGAack);
-            break;
-        case 3:
-            if(buf[i] == 'E')
-            {
-                dio_tmpstatus = 0;
-                if(walkdata_receive)
+                if(buf[i] == 'T')
+                    dio_tmpstatus = 4;
+                break;
+            case 2:
+                dio_tmpstatus = 3;
+                FPGAack.data = buf[i];
+                FPGAack_Publish.publish(FPGAack);
+                break;
+            case 3:
+                if(buf[i] == 'E')
                 {
-                    walkack.data = true;
-                    walkack_Publish.publish(walkack);
+                    dio_tmpstatus = 0;
+                    if(walkdata_receive)
+                    {
+                        walkack.data = true;
+                        walkack_Publish.publish(walkack);
+                    }
                 }
-            }
-            break;
-        case 4:
-            if(buf[i] == 'Y')
-            {
-                InterfaceFlag = 1;
-            }
-            else if(buf[i] == 'N')
-            {
-                InterfaceFlag = 0;
-                SendSectorPackage.clear();
-            }
-            else if(buf[i] == 0xF5)
-            {
-                walkdata_receive = true;
-            }
-            else
-            {
-                walkdata_receive = false;
-            }
-            dio_tmpstatus = 3;
-            break;
+                break;
+            case 4:
+                if(buf[i] == 'Y')
+                {
+                    InterfaceFlag = 1;
+                }
+                else if(buf[i] == 'N')
+                {
+                    InterfaceFlag = 0;
+                    SendSectorPackage.clear();
+                }
+                else if(buf[i] == 0xF5)
+                {
+                    walkdata_receive = true;
+                }
+                else
+                {
+                    walkdata_receive = false;
+                }
+                dio_tmpstatus = 3;
+                break;
         }
     }
 }
@@ -163,6 +164,74 @@ void mcssl_finish()
     cssl_stop();
 }
 //------------------------
+
+void motor_setPID(const tku_msgs::PIDpackage &msg)
+{
+    unsigned short blk_size;
+    unsigned short crc_value;
+
+    int motor_P_L,motor_I_L,motor_D_L;
+    int motor_P_H,motor_I_H,motor_D_H;
+    int motorID;
+
+    motorID = msg.motorID;
+    
+    motor_P_L = msg.motor_P & 0xFF;
+    motor_P_H = ((msg.motor_P)>>8) & 0xFF;
+    motor_I_L = msg.motor_I & 0xFF;
+    motor_I_H = ((msg.motor_I)>>8) & 0xFF;
+    motor_D_L = msg.motor_D & 0xFF;
+    motor_D_H = ((msg.motor_D)>>8) & 0xFF;
+    printf("ID:%d,set_P:%d,set_I:%d,set_D:%d\n",motorID,msg.motor_P,msg.motor_I,msg.motor_D);
+    printf("P:%d,I:%d,D:%d\n",msg.Pflag,msg.Iflag,msg.Dflag);
+    // Header
+    PIDpackage[0] = 0xFF;
+    PIDpackage[1] = 0xFF;
+    PIDpackage[2] = 0xFD;
+    // Reserved
+    PIDpackage[3] = 0x00;
+    // ID
+    PIDpackage[4] = motorID;
+    // Length      The length after the Packet Length field (Instruction, Parameter, CRC fields). Packet Length = number of Parameters + 3
+    PIDpackage[5] = 0x07;
+    PIDpackage[6] = 0;
+    // Instruction
+    PIDpackage[7] = 0x3;      //0x03 = write         // 0x83 = sync write
+
+    // Parameter
+    if(msg.Pflag)
+    {
+        PIDpackage[8]  = 0x54;
+        PIDpackage[10] = motor_P_L;      // data length(byte)
+        PIDpackage[11] = motor_P_H;
+    }
+    else if(msg.Iflag)
+    {
+        PIDpackage[8]  = 0x52;
+        PIDpackage[10] = motor_I_L;      // data length(byte)
+        PIDpackage[11] = motor_I_H;
+    }
+    else if(msg.Dflag)
+    {
+        PIDpackage[8]  = 0x50;
+        PIDpackage[10] = motor_D_L;      // data length(byte)
+        PIDpackage[11] = motor_D_H;
+    }
+    // addressL             // Velocity: 0x70 = 112 Position: 0x74(hex) = 116(dec) P_Gain: 0x54 I_Gain: 0x52 D_Gain: 0x50
+    PIDpackage[9] = 0;// addressH
+
+    blk_size = 5 + PIDpackage[5];
+    crc_value = update_crc(0,PIDpackage,blk_size);
+
+    PIDpackage[12] = (crc_value << 8) >> 8;
+    PIDpackage[13] = crc_value >> 8;
+
+    for(int cnt = 0; cnt < 14; cnt++)
+    {
+        cssl_putchar(serial,PIDpackage[cnt]);
+    }
+    
+}
 
 void packageinit()
 {
@@ -423,7 +492,7 @@ void paradata_send2fpga(int walking_mode, double y_swing, int period_t1, double 
     parameterpackage[27] = 0;   //reserve
     parameterpackage[28] = 0;   //reserve
     parameterpackage[29] = 0;   //reserve
-
+    printf("!!!!!!!!!!!!!!!!!!!");
     cssl_putdata(serial, parameterpackage, 31);
 }
 
@@ -754,7 +823,11 @@ void SectorSend2FPGAFunction(const std_msgs::Int16 &msg)
         {
         }
         switch(SendSectorPackage[0])
+<<<<<<< HEAD
         {
+=======
+        {   
+>>>>>>> 33f6f149fbaccc1b794e08433ead71e2538554b3
             case 241:
                 packageMotorData[0] = 0x53;
                 packageMotorData[1] = 0x54;
@@ -1238,7 +1311,11 @@ void InterfaceSend2SectorFunction(const tku_msgs::InterfaceSend2Sector &msg)
         OutFile <<"|| ";
         int pkgsum = 1;
         interface_ack.data = true;
+<<<<<<< HEAD
         if(SaveSectorPackage[2] == 242 || SaveSectorPackage[2] == 243||SaveSectorPackage[2] == 241)
+=======
+        if(SaveSectorPackage[2] == 241||SaveSectorPackage[2] == 242 || SaveSectorPackage[2] == 243)
+>>>>>>> 33f6f149fbaccc1b794e08433ead71e2538554b3
         {
             if(SaveSectorPackage[len-3] == 85)
             {
@@ -1842,6 +1919,7 @@ int main(int argc, char **argv)
     ros::Subscriber InterfaceSend2Sector = nh.subscribe("/package/InterfaceSend2Sector", 1000, InterfaceSend2SectorFunction);
     ros::Subscriber InterfaceSaveData_Subscribe = nh.subscribe("/package/InterfaceSaveMotion", 1000, InterfaceSaveDataFunction);
     ros::Subscriber SensorSet_Subscribe = nh.subscribe("/sensorset", 100, SensorSetFunction);
+    ros::Subscriber PIDcontroll_Subscribe = nh.subscribe("/package/pidcontroll", 100, motor_setPID);
     
     FPGAack_Publish = nh.advertise<std_msgs::Int16>("/package/FPGAack", 1000);
     walkack_Publish = nh.advertise<std_msgs::Bool>("/package/walkack", 1000);
