@@ -755,6 +755,19 @@ void SectorSend2FPGAFunction(const std_msgs::Int16 &msg)
         }
         switch(SendSectorPackage[0])
         {
+            case 241:
+                packageMotorData[0] = 0x53;
+                packageMotorData[1] = 0x54;
+                packageMotorData[2] = 0xF4;
+                for(int i =1; i < packagecnt; i++)
+                {
+                    packageMotorData[cnt++] = SendSectorPackage[i];                            
+                }    
+                cssl_putdata(serial, packageMotorData, cnt);
+                execute_ack.data = true;
+                ExecuteCallBack_Publish.publish(execute_ack);
+                printf("Execute is finsih\n");
+                break;
             case 242:
                 packageMotorData[0] = 0x53;
                 packageMotorData[1] = 0x54;
@@ -1225,7 +1238,7 @@ void InterfaceSend2SectorFunction(const tku_msgs::InterfaceSend2Sector &msg)
         OutFile <<"|| ";
         int pkgsum = 1;
         interface_ack.data = true;
-        if(SaveSectorPackage[2] == 242 || SaveSectorPackage[2] == 243)
+        if(SaveSectorPackage[2] == 242 || SaveSectorPackage[2] == 243||SaveSectorPackage[2] == 241)
         {
             if(SaveSectorPackage[len-3] == 85)
             {
@@ -1380,6 +1393,7 @@ bool InterfaceCheckSectorFunction(tku_msgs::CheckSector::Request &req, tku_msgs:
         }
         switch(CheckSectorPackage[0])
         {
+            case 241:
             case 242:
             case 243:
                 if(packagecnt != 85)
