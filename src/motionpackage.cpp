@@ -725,7 +725,7 @@ void HeadMotorFunction(const tku_msgs::HeadPackage &msg)
 //---Sector package---//
 void Standini()
 {
-    for(int i =0; i < 87; i++)
+    for(int i =0; i < 95; i++)
     {
         packageMotorData[i] = 0;                            
     } 
@@ -774,7 +774,7 @@ void Standini()
 
 void SectorSend2FPGAFunction(const std_msgs::Int16 &msg)
 {
-    for(int i =0; i < 87; i++)
+    for(int i =0; i < 95; i++)
     {
         packageMotorData[i] = 0;                            
     }
@@ -812,11 +812,13 @@ void SectorSend2FPGAFunction(const std_msgs::Int16 &msg)
         try
         {
             packagecnt = tool->readvalue(fin, "PackageCnt", 0);
+            printf("packagecnt = %d\n",packagecnt);
             SendSectorPackage.push_back(tool->readvalue(fin, "Package", 2));
             printf("mode = %d\n",SendSectorPackage[0]);
             for(int i = 1; i < packagecnt; i++)
             {
                 SendSectorPackage.push_back(tool->readvalue(fin, "|", 3));
+                printf("%d=%d\n",i,SendSectorPackage[i]);
             }
         }
         catch(exception e)
@@ -824,6 +826,7 @@ void SectorSend2FPGAFunction(const std_msgs::Int16 &msg)
         }
         switch(SendSectorPackage[0])
         {  
+            case 241:
                 packageMotorData[0] = 0x53;
                 packageMotorData[1] = 0x54;
                 packageMotorData[2] = 0xF4;
@@ -842,8 +845,8 @@ void SectorSend2FPGAFunction(const std_msgs::Int16 &msg)
                 packageMotorData[2] = 0xF2;
                 for(int i =1; i < packagecnt; i++)
                 {
-                    packageMotorData[cnt++] = SendSectorPackage[i];                            
-                }    
+                    packageMotorData[cnt++] = SendSectorPackage[i];
+                  }    
                 cssl_putdata(serial, packageMotorData, cnt);
                 execute_ack.data = true;
                 ExecuteCallBack_Publish.publish(execute_ack);
@@ -855,7 +858,8 @@ void SectorSend2FPGAFunction(const std_msgs::Int16 &msg)
                 packageMotorData[2] = 0xF3;
                 for(int i =1; i < packagecnt; i++)
                 {
-                    packageMotorData[cnt++] = SendSectorPackage[i];                       
+                    packageMotorData[cnt++] = SendSectorPackage[i];  
+                    printf("%d\n",packageMotorData[i+2]);                      
                 }
                 cssl_putdata(serial, packageMotorData, cnt);
                 execute_ack.data = true;
@@ -1183,12 +1187,12 @@ bool InterfaceReadDataFunction(tku_msgs::ReadMotion::Request &Motion_req, tku_ms
                         }
                         break;
                     case 1:
-                        for(int j = 0; j < 21; j++)
+                        for(int j = 0; j < 23; j++)
                         {
                             char Motor[20] = "M";
                             sprintf(str,"%d",j+1);
                             strcat(Motor, str);
-                            if(j == 20)
+                            if(j == 22)
                             {
                               num = tool->readvalue(fin, Motor, 0);
                             }
@@ -1200,12 +1204,12 @@ bool InterfaceReadDataFunction(tku_msgs::ReadMotion::Request &Motion_req, tku_ms
                         }
                         break;
                     case 2:
-                        for(int j = 0; j < 21; j++)
+                        for(int j = 0; j < 23; j++)
                         {
                             char Motor[20] = "M";
                             sprintf(str,"%d",j+1);
                             strcat(Motor, str);
-                            if(j == 20)
+                            if(j == 22)
                             {
                                 num = tool->readvalue(fin, Motor, 0);
                             }
@@ -1217,12 +1221,12 @@ bool InterfaceReadDataFunction(tku_msgs::ReadMotion::Request &Motion_req, tku_ms
                         }
                         break;
                     case 3:
-                        for(int j = 0; j < 21; j++)
+                        for(int j = 0; j < 23; j++)
                         {
                             char Motor[20] = "M";
                             sprintf(str,"%d",j+1);
                             strcat(Motor, str);
-                            if(j == 20)
+                            if(j == 22)
                             {
                                 num = tool->readvalue(fin, Motor, 0);
                             }
@@ -1234,12 +1238,12 @@ bool InterfaceReadDataFunction(tku_msgs::ReadMotion::Request &Motion_req, tku_ms
                         }
                         break;
                     case 4:
-                        for(int j = 0; j < 21; j++)
+                        for(int j = 0; j < 23; j++)
                         {
                             char Motor[20] = "M";
                             sprintf(str,"%d",j+1);
                             strcat(Motor, str);
-                            if(j == 20)
+                            if(j == 22)
                             {
                                 num = tool->readvalue(fin, Motor, 0);
                             }
@@ -1276,6 +1280,7 @@ void InterfaceSend2SectorFunction(const tku_msgs::InterfaceSend2Sector &msg)
     uint8_t checksum_Lfoot;
     uint8_t checksum_Rfoot;
     int len = SaveSectorPackage.size();
+    printf("size: %d\n",len);
     if (SaveSectorPackage[0] == 0x53 && SaveSectorPackage[1] == 0x54 && SaveSectorPackage[len-2] == 0x4E && SaveSectorPackage[len-1] == 0x45)
     {
         char pathend[20] = "/sector/";
@@ -1308,7 +1313,7 @@ void InterfaceSend2SectorFunction(const tku_msgs::InterfaceSend2Sector &msg)
         interface_ack.data = true;
         if(SaveSectorPackage[2] == 241||SaveSectorPackage[2] == 242 || SaveSectorPackage[2] == 243)
         {
-            if(SaveSectorPackage[len-3] == 85)
+            if(SaveSectorPackage[len-3] == 93)
             {
                 for(int i = 3; i < SaveSectorPackage[len-3] + 2; i++)
                 {
@@ -1325,9 +1330,17 @@ void InterfaceSend2SectorFunction(const tku_msgs::InterfaceSend2Sector &msg)
                     {
                         checksum_Lfoot_int = checksum_int - checksum_Lhand_int - checksum_Rhand_int;
                     }
-                    else
+                    else if(i < 87)
                     {
                         checksum_Rfoot_int = checksum_int - checksum_Lhand_int - checksum_Rhand_int - checksum_Lfoot_int;
+                    }
+                    else if(i < 91)
+                    {
+                        checksum_Lhand_int = checksum_int - checksum_Rfoot_int - checksum_Rhand_int - checksum_Lfoot_int;
+                    }
+                    else
+                    {
+                        checksum_Rhand_int = checksum_int - checksum_Rfoot_int - checksum_Lhand_int - checksum_Lfoot_int;
                     }
                 }
                 checksum_Lhand = checksum_Lhand_int & 0xff;
@@ -1464,7 +1477,7 @@ bool InterfaceCheckSectorFunction(tku_msgs::CheckSector::Request &req, tku_msgs:
             case 241:
             case 242:
             case 243:
-                if(packagecnt != 85)
+                if(packagecnt != 93)
                 {
                     printf("\033[0;31m242 243 Packagecnt is not correct!!\033[0m\n");
                     res.checkflag = false;
