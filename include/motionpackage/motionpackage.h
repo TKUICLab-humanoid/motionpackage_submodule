@@ -32,6 +32,7 @@
 #include "tku_msgs/ReadMotion.h"
 #include "tku_msgs/SensorPackage.h"
 #include "tku_msgs/SensorSet.h"
+#include "tku_msgs/PIDpackage.h"
 
 //---save
 #include <iostream>
@@ -84,6 +85,7 @@ vector<tsRobotis> RobotisList;
 TimeClass timer_sensor_set(10);
 struct timeval tstart, tend;
 double timeuse;
+uint8_t PIDpackage[31] = {0};
 uint8_t parameterpackage[31] = {0};
 uint8_t motorpackage[19] = {0};
 uint8_t HeadPackage[32] = {0};
