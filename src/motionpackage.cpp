@@ -1376,7 +1376,7 @@ void InterfaceSend2SectorFunction(const tku_msgs::InterfaceSend2Sector &msg)
                 if(SaveSectorPackage[i+1] == 68 && SaveSectorPackage[i+2] == 89)
                 {
                     printf("pkgsum = %d\n",pkgsum);
-                    if(pkgsum == 84 || pkgsum == 87)
+                    if(pkgsum == 84 || pkgsum == 87||pkgsum == 92||pkgsum == 95)
                     {
                         pkgsum = 1;
                         interface_ack.data = true;
@@ -1423,7 +1423,7 @@ bool InterfaceCheckSectorFunction(tku_msgs::CheckSector::Request &req, tku_msgs:
     int packagecnt;
     int returnvalue;
     bool motionlist_flag = true;
-    int cnt_tmp = 84;
+    int cnt_tmp = 92;
 
     if(req.data == 29)
     {
@@ -1503,7 +1503,7 @@ bool InterfaceCheckSectorFunction(tku_msgs::CheckSector::Request &req, tku_msgs:
                         {
                             motionlist_flag = false;
                         }
-                        cnt_tmp += 87;
+                        cnt_tmp += 95;
                     }
                     else
                     {
