@@ -1629,16 +1629,16 @@ void SingleMotorFunction(const tku_msgs::SingleMotorData &msg)
     onemotorpackage[cnt++] = Angle_L;
     onemotorpackage[cnt++] = Angle_H;
 
-    for(int i = cnt; i < 87; i++)
+    for(int i = cnt; i < 95; i++)
     {
         onemotorpackage[i] = 0;
     }
 
-    for(int i = 0; i < 87; i++)
+    for(int i = 0; i < 95; i++)
     {
         printf("onemotorpackage = %d\n",onemotorpackage[i]);
     }
-    cssl_putdata(serial, onemotorpackage, 87);
+    cssl_putdata(serial, onemotorpackage, 95);
 }
 //---HandSpeed package---//
 
