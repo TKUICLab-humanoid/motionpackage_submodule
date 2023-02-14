@@ -823,11 +823,7 @@ void SectorSend2FPGAFunction(const std_msgs::Int16 &msg)
         {
         }
         switch(SendSectorPackage[0])
-<<<<<<< HEAD
-        {
-=======
         {   
->>>>>>> 33f6f149fbaccc1b794e08433ead71e2538554b3
             case 241:
                 packageMotorData[0] = 0x53;
                 packageMotorData[1] = 0x54;
@@ -1311,11 +1307,7 @@ void InterfaceSend2SectorFunction(const tku_msgs::InterfaceSend2Sector &msg)
         OutFile <<"|| ";
         int pkgsum = 1;
         interface_ack.data = true;
-<<<<<<< HEAD
-        if(SaveSectorPackage[2] == 242 || SaveSectorPackage[2] == 243||SaveSectorPackage[2] == 241)
-=======
         if(SaveSectorPackage[2] == 241||SaveSectorPackage[2] == 242 || SaveSectorPackage[2] == 243)
->>>>>>> 33f6f149fbaccc1b794e08433ead71e2538554b3
         {
             if(SaveSectorPackage[len-3] == 85)
             {
