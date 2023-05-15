@@ -1751,7 +1751,13 @@ void SensorSetFunction(const tku_msgs::SensorSet &msg)
     //     Gain_KP = msg.GainKP;
     //     Gain_KD = msg.GainKD;
     // }
-    if(setopt & 0x08)
+    if(setopt & 0x02)
+    {
+        Desire_parameter[0] = msg.sensor_P;
+        Desire_parameter[1] = msg.sensor_I;
+        Desire_parameter[2] = msg.sensor_D;
+    }
+    else if(setopt & 0x08)
     {
         Desire_parameter[0] = msg.Roll;
         Desire_parameter[1] = msg.Pitch;
