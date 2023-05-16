@@ -825,11 +825,7 @@ void SectorSend2FPGAFunction(const std_msgs::Int16 &msg)
         {
         }
         switch(SendSectorPackage[0])
-<<<<<<< HEAD
         {   
-=======
-        {  
->>>>>>> 1c2490533bde6aa9ef86c3cadb3afefa8135c063
             case 241:
                 packageMotorData[0] = 0x53;
                 packageMotorData[1] = 0x54;
@@ -1767,7 +1763,13 @@ void SensorSetFunction(const tku_msgs::SensorSet &msg)
     //     Gain_KP = msg.GainKP;
     //     Gain_KD = msg.GainKD;
     // }
-    if(setopt & 0x08)
+    if(setopt & 0x02)
+    {
+        Desire_parameter[0] = msg.sensor_P;
+        Desire_parameter[1] = msg.sensor_I;
+        Desire_parameter[2] = msg.sensor_D;
+    }
+    else if(setopt & 0x08)
     {
         Desire_parameter[0] = msg.Roll;
         Desire_parameter[1] = msg.Pitch;
