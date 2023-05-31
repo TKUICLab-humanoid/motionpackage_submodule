@@ -797,6 +797,7 @@ void SectorSend2FPGAFunction(const std_msgs::Int16 &msg)
     else
     {
         strcpy(path, tool->parameterPath.c_str());
+        strcat(path,parameterPath);
         strcat(pathend, filename);
         strcat(path, pathend);
         strcat(path, pathend2);
@@ -965,6 +966,7 @@ void InterfaceSaveDataFunction(const tku_msgs::SaveMotion &msg)
         else
         {
             strcpy(path, tool->parameterPath.c_str());
+            strcat(path,parameterPath);
             strcat(pathend, filename.c_str());
             strcat(path, pathend);
         }
@@ -1135,6 +1137,7 @@ bool InterfaceReadDataFunction(tku_msgs::ReadMotion::Request &Motion_req, tku_ms
     else
     {
         strcpy(path, tool->parameterPath.c_str());
+        strcat(path,parameterPath);
         strcat(pathend, filename.c_str());
         strcat(path, pathend);
     }
@@ -1293,6 +1296,7 @@ void InterfaceSend2SectorFunction(const tku_msgs::InterfaceSend2Sector &msg)
         else
         {
             strcpy(path, tool->parameterPath.c_str());
+            strcat(path,parameterPath);
             strcat(pathend, filename.c_str());
             strcat(path, pathend);
             strcat(path, pathend2);
@@ -1423,6 +1427,7 @@ bool InterfaceCheckSectorFunction(tku_msgs::CheckSector::Request &req, tku_msgs:
     else
     {
         strcpy(path, tool->parameterPath.c_str());
+        strcat(path,parameterPath);
         strcat(pathend, filename);
         strcat(path, pathend);
         strcat(path, pathend2);
@@ -1527,6 +1532,7 @@ void MotorSpeedFunction(const tku_msgs::SandHandSpeed &msg)
     char pathend[20] = "/sector/";
     char pathend2[20] = ".ini";
     strcpy(path, tool->parameterPath.c_str());
+    strcat(path,parameterPath);
     strcat(pathend, filename);
     strcat(path, pathend);
     strcat(path, pathend2);
@@ -1924,7 +1930,11 @@ int main(int argc, char **argv)
     InterfaceCallBack_Publish = nh.advertise<std_msgs::Bool>("/package/motioncallback", 1000);
     ExecuteCallBack_Publish = nh.advertise<std_msgs::Bool>("/package/executecallback", 1000);
     Sensorpackage_Publish = nh.advertise<tku_msgs::SensorPackage>("/package/sensorpackage", 1000);
-    
+    //--根據項目更改位置--//
+    strcat(parameterPath,argv[1]);
+    strcat(parameterPath,"/Parameter");
+    printf("%s\n",parameterPath);
+    //------------------//
     gettimeofday(&tstart, NULL);
     do{
 
