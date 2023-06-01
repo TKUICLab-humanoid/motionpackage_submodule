@@ -109,7 +109,7 @@ void Sensor_Data_Process();
 bool fall_Down_Flag = false;
 bool old_fall_Down_Flag = false;
 
-char parameterPath[20]="/";
+char parameterPath[20];
 
 int Desire_Roll = 0;
 int Desire_Pitch = 0;
