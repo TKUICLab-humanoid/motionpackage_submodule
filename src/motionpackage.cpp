@@ -1910,6 +1910,8 @@ int main(int argc, char **argv)
 
     ros::init(argc, argv, "motionpackage");
 	ros::NodeHandle nh;
+    std::string location;
+    nh.getParam("/location",location);
 
     ros::Subscriber parameter_sub = nh.subscribe("/package/parameterdata", 1, parameterCallback);
     ros::Subscriber motion_sub = nh.subscribe("/package/walkingdata", 1, motionCallback);
@@ -1931,23 +1933,23 @@ int main(int argc, char **argv)
     ExecuteCallBack_Publish = nh.advertise<std_msgs::Bool>("/package/executecallback", 1000);
     Sensorpackage_Publish = nh.advertise<tku_msgs::SensorPackage>("/package/sensorpackage", 1000);
     //--根據項目更改位置--//
-    strcat(parameterPath,argv[1]);
+    strcat(parameterPath,location.c_str());
     strcat(parameterPath,"/Parameter");
     printf("%s\n",parameterPath);
     //------------------//
     gettimeofday(&tstart, NULL);
-    do{
+    // do{
 
-        if(mcssl_init() > 0)
-        {
-            Standini();
-            break;
-        }else
-        {
-            usleep(1000000);//1s = 1,000,000 us
-        }
+    //     if(mcssl_init() > 0)
+    //     {
+    //         Standini();
+    //         break;
+    //     }else
+    //     {
+    //         usleep(1000000);//1s = 1,000,000 us
+    //     }
 
-    }while(ros::ok());
+    // }while(ros::ok());
     printf("Motion is running\n");
     usleep(1000000);
     ros::Rate loop_rate(60);
