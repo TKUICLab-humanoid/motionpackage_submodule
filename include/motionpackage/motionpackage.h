@@ -58,7 +58,7 @@ typedef struct
 #define offset4 61
 // #define SENSOR_BUF_SIZE 60
 #define SENSOR_SET_PACKAGE_SIZE 12
-#define IMU_PACKAGE_SIZE 28
+#define IMU_PACKAGE_SIZE 34
 
 using std::string;
 cssl_t *serial;

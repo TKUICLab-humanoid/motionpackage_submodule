@@ -1635,6 +1635,7 @@ void Sensor_Data_Process()
 {
     uint16_t Sensor_Data_tmp[11];
     double IMU_Value[3];
+    double Accel_Value[3];
     uint16_t ForceSensor_Value_tmp[8];
     int ForceSensor_Value[8];    
     int Sensor_Data_Count = 3;
@@ -1659,6 +1660,19 @@ void Sensor_Data_Process()
             IMU_Value[i] = (double)(Sensor_Data_tmp[i]) / 100.0;
         }
         sensorpackage.IMUData.push_back(IMU_Value[i]);
+    }
+    for(int i=0; i<3; i++)
+    {
+        Sensor_Data_tmp[i+3] = ((sensor_data_buf[Sensor_Data_Count++] << 8) | (sensor_data_buf[Sensor_Data_Count++]));
+        if(Sensor_Data_tmp[i+3] & 0x8000) //negative
+        {
+            Accel_Value[i] = (double)( ~(Sensor_Data_tmp[i+3] & 0x7FFF) + 1) / 100.0;
+        }
+        else                            //positive
+        {
+            Accel_Value[i] = (double)(Sensor_Data_tmp[i+3]) / 100.0;
+        }
+        sensorpackage.AccelData.push_back(Accel_Value[i]);
     }
     
     //For fall down & get up   //Tag for search: #falldown
@@ -1722,6 +1736,7 @@ void Sensor_Data_Process()
     }
     Sensorpackage_Publish.publish(sensorpackage);
     sensorpackage.IMUData.clear();
+    sensorpackage.AccelData.clear();
     sensorpackage.ForceSensorData.clear();
 }
 
