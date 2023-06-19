@@ -796,7 +796,8 @@ void SectorSend2FPGAFunction(const std_msgs::Int16 &msg)
     }
     else
     {
-        strcpy(path, tool->parameterPath.c_str());
+        strcpy(path, tool->getPackagePath(parameterPath).c_str());
+        strcat(path,"/Parameter");
         strcat(pathend, filename);
         strcat(path, pathend);
         strcat(path, pathend2);
@@ -967,7 +968,8 @@ void InterfaceSaveDataFunction(const tku_msgs::SaveMotion &msg)
         }
         else
         {
-            strcpy(path, tool->parameterPath.c_str());
+            strcpy(path, tool->getPackagePath(parameterPath).c_str());
+            strcat(path,"/Parameter");
             strcat(pathend, filename.c_str());
             strcat(path, pathend);
         }
@@ -1137,7 +1139,8 @@ bool InterfaceReadDataFunction(tku_msgs::ReadMotion::Request &Motion_req, tku_ms
     }
     else
     {
-        strcpy(path, tool->parameterPath.c_str());
+        strcpy(path, tool->getPackagePath(parameterPath).c_str());
+        strcat(path,"/Parameter");
         strcat(pathend, filename.c_str());
         strcat(path, pathend);
     }
@@ -1296,10 +1299,12 @@ void InterfaceSend2SectorFunction(const tku_msgs::InterfaceSend2Sector &msg)
         }
         else
         {
-            strcpy(path, tool->parameterPath.c_str());
+            strcpy(path, tool->getPackagePath(parameterPath).c_str());
+            strcat(path,"/Parameter");
             strcat(pathend, filename.c_str());
             strcat(path, pathend);
             strcat(path, pathend2);
+
         }
         ofstream OutFile(path);
         printf("SaveSectorBegin\n");
@@ -1434,7 +1439,8 @@ bool InterfaceCheckSectorFunction(tku_msgs::CheckSector::Request &req, tku_msgs:
     }
     else
     {
-        strcpy(path, tool->parameterPath.c_str());
+        strcpy(path, tool->getPackagePath(parameterPath).c_str());
+        strcat(path,"/Parameter");
         strcat(pathend, filename);
         strcat(path, pathend);
         strcat(path, pathend2);
@@ -1538,10 +1544,12 @@ void MotorSpeedFunction(const tku_msgs::SandHandSpeed &msg)
     sprintf(filename,"%d",msg.sector);
     char pathend[20] = "/sector/";
     char pathend2[20] = ".ini";
-    strcpy(path, tool->parameterPath.c_str());
+    strcpy(path, tool->getPackagePath(parameterPath).c_str());
+    strcat(path,"/Parameter");
     strcat(pathend, filename);
     strcat(path, pathend);
     strcat(path, pathend2);
+
     int packagecnt;
     int cnt = 3;
     fstream fin;
@@ -1916,6 +1924,8 @@ int main(int argc, char **argv)
 
     ros::init(argc, argv, "motionpackage");
 	ros::NodeHandle nh;
+    std::string location;
+    nh.getParam("/location",location);
 
     ros::Subscriber parameter_sub = nh.subscribe("/package/parameterdata", 1, parameterCallback);
     ros::Subscriber motion_sub = nh.subscribe("/package/walkingdata", 1, motionCallback);
@@ -1936,7 +1946,10 @@ int main(int argc, char **argv)
     InterfaceCallBack_Publish = nh.advertise<std_msgs::Bool>("/package/motioncallback", 1000);
     ExecuteCallBack_Publish = nh.advertise<std_msgs::Bool>("/package/executecallback", 1000);
     Sensorpackage_Publish = nh.advertise<tku_msgs::SensorPackage>("/package/sensorpackage", 1000);
-    
+    //--根據項目更改位置--//
+    strcat(parameterPath,location.c_str());
+    printf("%s\n",parameterPath);
+    //------------------//
     gettimeofday(&tstart, NULL);
     do{
 
