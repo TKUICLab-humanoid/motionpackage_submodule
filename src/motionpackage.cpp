@@ -248,15 +248,18 @@ void packageinit()
     motorpackage[5] = 3;    // data length is 3 bytes
     motorpackage[18] = 0x45;
 }
-
-void paradata_send2fpga(int walking_mode, double x_swing, double y_swing, double z_swing, int period_t1, int period_t2, int sample_time, double lock_range, double base_default_z, double y_swing_shift, double x_swing_com, double base_lift_z, bool stand_balance)
+void paradata_send2fpga(int walking_mode, double x_swing, double y_swing, double z_swing, int period_t1, int period_t2, int sample_time, double lock_range, double base_default_z, double y_swing_shift, double x_swing_com, double base_lift_z, double rightfoot_shift_z, double com_y_swing, double now_stand_height, double now_com_height, bool stand_balance)
 {
     uint8_t x_swing_h, x_swing_l, y_swing_h, y_swing_l, z_swing_h, z_swing_l;
     uint8_t period_t1_h, period_t1_l, period_t2_h, period_t2_l;
     uint8_t base_default_z_h, base_default_z_l;
     uint8_t y_swing_shift_h, y_swing_shift_l;
     uint8_t x_swing_com_h, x_swing_com_l;
-    uint8_t base_lift_z_h, base_lift_z_l;
+    uint8_t base_lift_z_h, base_lift_z_l;    
+    uint8_t rightfoot_shift_z_h, rightfoot_shift_z_l;
+    uint8_t com_y_swing_h, com_y_swing_l;
+    uint8_t now_stand_height_h, now_stand_height_l;
+    uint8_t now_com_height_h, now_com_height_l;
 
     if(x_swing < 0)
     {
@@ -323,6 +326,49 @@ void paradata_send2fpga(int walking_mode, double x_swing, double y_swing, double
         base_lift_z_h = (((int)(base_lift_z * 100.0)) >> 8) & 0xFF;
         base_lift_z_l = ((int)(base_lift_z * 100.0)) & 0xFF;
     }
+    if(rightfoot_shift_z < 0)
+    {
+        rightfoot_shift_z_h = ((((int)(rightfoot_shift_z * -100.0)) >> 8) & 0xFF) | 0x80;
+        rightfoot_shift_z_l = ((int)(rightfoot_shift_z * -100.0)) & 0xFF;
+    }
+    else
+    {
+        rightfoot_shift_z_h = (((int)(rightfoot_shift_z * 100.0)) >> 8) & 0xFF;
+        rightfoot_shift_z_l = ((int)(rightfoot_shift_z * 100.0)) & 0xFF;
+    }
+
+    if(com_y_swing < 0)
+    {
+        com_y_swing_h = ((((int)(com_y_swing * -100.0)) >> 8) & 0xFF) | 0x80;
+        com_y_swing_l = ((int)(com_y_swing * -100.0)) & 0xFF;
+    }
+    else
+    {
+        com_y_swing_h = (((int)(com_y_swing * 100.0)) >> 8) & 0xFF;
+        com_y_swing_l = ((int)(com_y_swing * 100.0)) & 0xFF;
+    }
+
+    if(now_stand_height < 0)
+    {
+        now_stand_height_h = ((((int)(now_stand_height * -100.0)) >> 8) & 0xFF) | 0x80;
+        now_stand_height_l = ((int)(now_stand_height * -100.0)) & 0xFF;
+    }
+    else
+    {
+        now_stand_height_h = (((int)(now_stand_height * 100.0)) >> 8) & 0xFF;
+        now_stand_height_l = ((int)(now_stand_height * 100.0)) & 0xFF;
+    }
+
+    if(now_com_height < 0)
+    {
+        now_com_height_h = ((((int)(now_com_height * -100.0)) >> 8) & 0xFF) | 0x80;
+        now_com_height_l = ((int)(now_com_height * -100.0)) & 0xFF;
+    }
+    else
+    {
+        now_com_height_h = (((int)(now_com_height * 100.0)) >> 8) & 0xFF;
+        now_com_height_l = ((int)(now_com_height * 100.0)) & 0xFF;
+    }
 
     base_default_z_h = (((int)(base_default_z * 100.0)) >> 8) & 0xFF;
     base_default_z_l = ((int)(base_default_z * 100.0)) & 0xFF;
@@ -333,12 +379,12 @@ void paradata_send2fpga(int walking_mode, double x_swing, double y_swing, double
     period_t2_h = (period_t2 >> 8) & 0xFF;
     period_t2_l = period_t2 & 0xFF;
 
-    parameterpackage[6] = x_swing_h;
-    parameterpackage[7] = x_swing_l;
+    parameterpackage[6] = com_y_swing_h;
+    parameterpackage[7] = com_y_swing_l;
     parameterpackage[8] = y_swing_h;
     parameterpackage[9] = y_swing_l;
-    parameterpackage[10] = z_swing_h;
-    parameterpackage[11] = z_swing_l;
+    parameterpackage[10] = rightfoot_shift_z_h;
+    parameterpackage[11] = rightfoot_shift_z_l;
     parameterpackage[12] = period_t1_h;
     parameterpackage[13] = period_t1_l;
     parameterpackage[14] = period_t2_h;
@@ -347,13 +393,13 @@ void paradata_send2fpga(int walking_mode, double x_swing, double y_swing, double
     parameterpackage[17] = ((int)(lock_range * 100.0)) & 0xFF;
     parameterpackage[18] = base_default_z_h;
     parameterpackage[19] = base_default_z_l;
-    parameterpackage[20] = x_swing_com_h;
-    parameterpackage[21] = x_swing_com_l;
-    parameterpackage[22] = y_swing_shift_h;
-    parameterpackage[23] = y_swing_shift_l;
-    parameterpackage[24] = base_lift_z_h;
-    parameterpackage[25] = base_lift_z_l;
-    parameterpackage[26] = walking_mode & 0xFF;
+    parameterpackage[20] = base_lift_z_h;
+    parameterpackage[21] = base_lift_z_l;
+    parameterpackage[22] = now_stand_height_h;
+    parameterpackage[23] = now_stand_height_l;
+    parameterpackage[24] = now_com_height_h;
+    parameterpackage[25] = now_com_height_l;
+    parameterpackage[26] = walking_mode & 0xFF;   
     parameterpackage[27] = 0;   //reserve
     parameterpackage[28] = 0;   //reserve
     parameterpackage[29] = stand_balance;   //reserve
@@ -501,6 +547,7 @@ void parameterCallback(const tku_msgs::Parameter_message& msg)
     int walking_mode, period_t1, period_t2, sample_time;
     double x_swing, y_swing, z_swing, lock_range;
     double x_swing_com, y_swing_shift, base_default_z, base_lift_z;
+    double rightfoot_shift_z, com_y_swing, now_stand_height, now_com_height;
     double kick_point_x, kick_point_y, kick_point_z, back_point_x, back_point_z, support_foot_upper_hip_pitch, kick_foot_ankle_upper_pitch,support_foot_upper_ankle_pitch;
     bool stand_balance;
 
@@ -515,6 +562,10 @@ void parameterCallback(const tku_msgs::Parameter_message& msg)
     y_swing_shift = msg.Y_Swing_Shift;
     x_swing_com = msg.X_Swing_COM;
     base_lift_z = msg.BASE_LIFT_Z;
+    rightfoot_shift_z = msg.rightfoot_shift_z;
+    com_y_swing = msg.com_y_swing;
+    now_stand_height = msg.now_stand_height;
+    now_com_height = msg.now_com_height;
     walking_mode = msg.Walking_Mode;
     stand_balance = msg.Stand_Balance;
     kick_point_x = msg.B_SplineParam.Kick_Point_X;
@@ -527,7 +578,7 @@ void parameterCallback(const tku_msgs::Parameter_message& msg)
     kick_foot_ankle_upper_pitch = msg.B_SplineParam.Kick_Foot_Ankle_Upper_Pitch;
     if(walking_mode != 9 && walking_mode != 10)
     {
-        paradata_send2fpga(walking_mode, x_swing,  y_swing,  z_swing,  period_t1,  period_t2, sample_time,  lock_range,  base_default_z,  y_swing_shift,  x_swing_com,  base_lift_z, stand_balance);
+        paradata_send2fpga(walking_mode, x_swing,  y_swing,  z_swing,  period_t1,  period_t2, sample_time,  lock_range,  base_default_z,  y_swing_shift,  x_swing_com,  base_lift_z, rightfoot_shift_z, com_y_swing, now_stand_height, now_com_height, stand_balance);
     }
     else
     {
