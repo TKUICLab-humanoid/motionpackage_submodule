@@ -33,6 +33,7 @@
 #include "tku_msgs/SensorPackage.h"
 #include "tku_msgs/SensorSet.h"
 #include "tku_msgs/PIDpackage.h"
+#include "tku_msgs/Motor_Feedback.h"
 
 //---save
 #include <iostream>
@@ -88,6 +89,7 @@ double timeuse;
 uint8_t PIDpackage[31] = {0};
 uint8_t parameterpackage[31] = {0};
 uint8_t motorpackage[19] = {0};
+uint8_t feedbackpackage[5] = {0};
 uint8_t HeadPackage[32] = {0};
 uint8_t sectorpackage[5] = {0};
 uint8_t torquePackage[13] = {0};
@@ -96,15 +98,20 @@ uint8_t packageMotorData[87] = {0}; 	// address||R MotorSum (id angleL angleH sp
 uint8_t packageEnd[2] = {0x4E, 0x45};	// N E
 uint8_t sensorsetpackage[SENSOR_SET_PACKAGE_SIZE] = {0};
 unsigned int savemotor9[3] = {0};
-int InterfaceFlag = 0;
 
+int FeedbackLF_store[6],FeedbackRF_store[6],FeedbackLH_store[4],FeedbackRH_store[4];
+double IMU_Value_store[3];
+int ForceSensor_Value_store[8];
+int InterfaceFlag = 0;
 
 bool isBufFull = false;
 int sensor_data_buf_cnt = 0;
 uint8_t sensor_data_buf[IMU_PACKAGE_SIZE] = {0};
+uint8_t feedback_data_buf[IMU_PACKAGE_SIZE] = {0};
+uint8_t feedback_hand_data_buf[IMU_PACKAGE_SIZE] = {0};
 
 unsigned short update_crc(unsigned short crc_accum, unsigned char *data_blk_ptr, unsigned short data_blk_size);
-void Sensor_Data_Process();
+void Sensor_Data_Process(int mode);
 
 bool fall_Down_Flag = false;
 bool old_fall_Down_Flag = false;

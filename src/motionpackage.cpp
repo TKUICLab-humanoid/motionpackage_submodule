@@ -8,21 +8,49 @@ static void head_callback(int id, uint8_t *buf, int length)
 
 static void IMU_callback(int id, uint8_t *buf, int length)
 {
-    bool got_imu_package_flag = false;
+    bool got_imu_package_flag = false, got_feedback_package_flag = false, got_feedback_package_hand_flag = false;
+    int data = 1; // data:1 = IMU & foot_press 2: feedback_motion 
     int index = 0;
 
     for(int i=0; i<length; i++)
+    {    
         IMUPackage.push_back(buf[i]);
+        // printf("buf %x\n",buf[i]);
+    }
     
+    // printf("IMUPackage.size() = %d\n",IMUPackage.size());
     if(IMUPackage.size() >= IMU_PACKAGE_SIZE)
     {
         for(int i=0; i<IMUPackage.size(); i++)
         {
-            if(IMUPackage[i] == 0x53 && IMUPackage[i+1] == 0x54 && IMUPackage[i+2] == 0xF7 && IMUPackage[i+IMU_PACKAGE_SIZE-1])
-            index = i;
-            got_imu_package_flag = true;
+            if(IMUPackage[i] == 0x53 && IMUPackage[i+1] == 0x54 && IMUPackage[i+2] == 0xF7 /*&& IMUPackage[i+IMU_PACKAGE_SIZE-1] == 0x45*/)
+            {
+                index = i;
+                // printf("IMU_index = %d\n",index);
+                got_imu_package_flag = true;
+                data = 1;
+            }
+            else if(IMUPackage[i] == 0x53 && IMUPackage[i+1] == 0x54 && IMUPackage[i+2] == 0xF8 /*&& IMUPackage[i+IMU_PACKAGE_SIZE-1] == 0x45*/)
+            {
+                index = i;
+                // printf("feedback_index = %d\n",index);
+                // printf("%d:%x\n",i,IMUPackage[i]);
+                got_feedback_package_flag = true;
+                data = 2;
+            }
+            else if(IMUPackage[i] == 0x53 && IMUPackage[i+1] == 0x54 && IMUPackage[i+2] == 0xF0 /*&& IMUPackage[i+IMU_PACKAGE_SIZE-1] == 0x45*/)
+            {
+                index = i;
+                // printf("feedback_index = %d\n",index);
+                // printf("%d:%x\n",i,IMUPackage[i]);
+                got_feedback_package_hand_flag = true;
+                data = 3;
+            }
+            // }
+            
         }
-
+        
+        // printf("index = %d\n",index);
         if(got_imu_package_flag)
         {
             for(int i=0; i<IMU_PACKAGE_SIZE; i++)
@@ -30,9 +58,48 @@ static void IMU_callback(int id, uint8_t *buf, int length)
                 sensor_data_buf[i] = IMUPackage[index+i];
             }
         }
-        Sensor_Data_Process();
+        else if(got_feedback_package_flag)
+        {
+            for(int i=0; i<IMU_PACKAGE_SIZE; i++)
+            {
+                feedback_data_buf[i] = IMUPackage[index+i];
+            }
+        }
+        else if(got_feedback_package_hand_flag)
+        {
+            for(int i=0; i<IMU_PACKAGE_SIZE; i++)
+            {
+                feedback_hand_data_buf[i] = IMUPackage[index+i];
+            }
+        }
+        Sensor_Data_Process(data);
         IMUPackage.clear();
     }
+    // bool got_imu_package_flag = false;
+    // int index = 0;
+
+    // for(int i=0; i<length; i++)
+    //     IMUPackage.push_back(buf[i]);
+    
+    // if(IMUPackage.size() >= IMU_PACKAGE_SIZE)
+    // {
+    //     for(int i=0; i<IMUPackage.size(); i++)
+    //     {
+    //         if(IMUPackage[i] == 0x53 && IMUPackage[i+1] == 0x54 && IMUPackage[i+2] == 0xF7 && IMUPackage[i+IMU_PACKAGE_SIZE-1])
+    //         index = i;
+    //         got_imu_package_flag = true;
+    //     }
+
+    //     if(got_imu_package_flag)
+    //     {
+    //         for(int i=0; i<IMU_PACKAGE_SIZE; i++)
+    //         {
+    //             sensor_data_buf[i] = IMUPackage[index+i];
+    //         }
+    //     }
+    //     Sensor_Data_Process();
+    //     IMUPackage.clear();
+    // }
 }
 
 static void mcssl_callback(int id, uint8_t *buf, int length)
@@ -248,6 +315,44 @@ void packageinit()
     motorpackage[5] = 3;    // data length is 3 bytes
     motorpackage[18] = 0x45;
 }
+
+void AskFeedback2FPGAFunction(const tku_msgs::Motor_Feedback &msg)
+{
+    uint16_t mode = msg.Feedback;
+    // printf("SendMotorFeedback\n");
+    feedbackpackage[0] = 0x53;
+    feedbackpackage[1] = 0x54;
+    feedbackpackage[2] = 0xF9;
+    if (mode == 1){
+        feedbackpackage[3] = 1;
+    }
+    else if(mode == 2){
+        feedbackpackage[3] = 2;
+    }
+    else if(mode == 3){
+        feedbackpackage[3] = 3;
+    }
+    else if(mode == 4){
+        feedbackpackage[3] = 4;
+    }
+    else if(mode == 5){
+        feedbackpackage[3] = 5;
+    }
+    else if(mode == 6){
+        feedbackpackage[3] = 6;
+    }
+    else if(mode == 7){
+        feedbackpackage[3] = 7;
+    }
+    else{
+        feedbackpackage[3] = 8;
+    }
+    feedbackpackage[4] = 0;    //Reserve
+    feedbackpackage[5] = 0x45;
+    cssl_putdata(serial, feedbackpackage, 6);
+    ROS_INFO("%u", feedbackpackage[3]);
+}
+
 void paradata_send2fpga(int walking_mode, double x_swing, double y_swing, double z_swing, int period_t1, int period_t2, int sample_time, double lock_range, double base_default_z, double y_swing_shift, double x_swing_com, double base_lift_z, double rightfoot_shift_z, double com_y_swing, double now_stand_height, double now_com_height, bool stand_balance)
 {
     uint8_t x_swing_h, x_swing_l, y_swing_h, y_swing_l, z_swing_h, z_swing_l;
@@ -1688,12 +1793,14 @@ void SingleMotorFunction(const tku_msgs::SingleMotorData &msg)
 //---HandSpeed package---//
 
 //---Receive & Process Sensor Data 
-void Sensor_Data_Process()
+void Sensor_Data_Process(int mode)
 {
     uint16_t Sensor_Data_tmp[11];
     double IMU_Value[3];
     uint16_t ForceSensor_Value_tmp[8];
-    int ForceSensor_Value[8];    
+    int ForceSensor_Value[8];
+    uint16_t FeedbackLF_tmp[6],FeedbackRF_tmp[6], FeedbackLH_tmp[4],FeedbackRH_tmp[4];
+    int FeedbackLF[6],FeedbackRF[6], FeedbackLH[4],FeedbackRH[4];    
     int Sensor_Data_Count = 3;
     bool isDataOk = false;
     tku_msgs::SensorPackage sensorpackage;
@@ -1703,84 +1810,262 @@ void Sensor_Data_Process()
     backward_Sector_Number.data = (short) 87; 
 
     isBufFull = false;
-
-    for(int i=0; i<3; i++)
-    {
-        Sensor_Data_tmp[i] = ((sensor_data_buf[Sensor_Data_Count++] << 8) | (sensor_data_buf[Sensor_Data_Count++]));
-        if(Sensor_Data_tmp[i] & 0x8000) //negative
+    if(mode == 1){
+        for(int i=0; i<3; i++)
         {
-            IMU_Value[i] = (double)( ~(Sensor_Data_tmp[i] & 0x7FFF) + 1) / 100.0;
+            Sensor_Data_tmp[i] = ((sensor_data_buf[Sensor_Data_Count++] << 8) | (sensor_data_buf[Sensor_Data_Count++]));
+            if(Sensor_Data_tmp[i] & 0x8000) //negative
+            {
+                IMU_Value[i] = (double)( ~(Sensor_Data_tmp[i] & 0x7FFF) + 1) / 100.0;
+            }
+            else                            //positive
+            {
+                IMU_Value[i] = (double)(Sensor_Data_tmp[i]) / 100.0;
+            }
+            IMU_Value_store[i] = IMU_Value[i];
+            sensorpackage.IMUData.push_back(IMU_Value[i]);
         }
-        else                            //positive
-        {
-            IMU_Value[i] = (double)(Sensor_Data_tmp[i]) / 100.0;
-        }
-        sensorpackage.IMUData.push_back(IMU_Value[i]);
-    }
-    
-    //For fall down & get up   //Tag for search: #falldown
-    /*
-
-    old_fall_Down_Flag = fall_Down_Flag;
-    if(sensor_data_buf[Sensor_Data_Count] == 0x46 || sensor_data_buf[Sensor_Data_Count] == 0x42){         
-        //(Forward)F =0x46  (Stand)S = 0x53  (Backward)B = 0x42
-        fall_Down_Flag = true;
-    }
-    else if (sensor_data_buf[Sensor_Data_Count] == 0x53)     //(Forward)F =0x46  (Stand)S = 0x53 (Backward)B = 0x42
-    {
-        fall_Down_Flag = false;
-    }
-    else
-    {
-        fall_Down_Flag = fall_Down_Flag;    
-    }
-
- 
-
-    //call sector  to  get  up
-    if( (old_fall_Down_Flag != fall_Down_Flag) && (fall_Down_Flag == true) && sensor_data_buf[Sensor_Data_Count] == 0x46)//forward fall down
-    {
-        SectorSend2FPGAFunction(forward_Sector_Number);
-        //printf("forward_Sector_Number execute ");
-    }
-    else if( (old_fall_Down_Flag != fall_Down_Flag) && (fall_Down_Flag == true) && sensor_data_buf[Sensor_Data_Count] == 0x42)//backward fall down
-    {
-        SectorSend2FPGAFunction(backward_Sector_Number);
-        //printf("backward_Sector_Number execute ");
-    }
-    else if ((old_fall_Down_Flag != fall_Down_Flag && fall_Down_Flag == false))
-    {
-        //printf("recover to  stand");
-        //here  can  add stand flag   if   code  need;
-    }
-    else
-    {
         
-    }
+        //For fall down & get up   //Tag for search: #falldown
+        /*
 
-    */
-
-    Sensor_Data_Count+=1;
-
-    Sensor_Data_Count+=1;//jump the reserve package byte
-
-    for(int i=0; i<8; i++)
-    {
-        ForceSensor_Value_tmp[i] = ((sensor_data_buf[Sensor_Data_Count++] << 8) | (sensor_data_buf[Sensor_Data_Count++]));
-        if(ForceSensor_Value_tmp[i] & 0x8000)   //negative
-        {
-            ForceSensor_Value[i] =(((int)((ForceSensor_Value_tmp[i]) & (0x7FFF))) * (-1)) ;
+        old_fall_Down_Flag = fall_Down_Flag;
+        if(sensor_data_buf[Sensor_Data_Count] == 0x46 || sensor_data_buf[Sensor_Data_Count] == 0x42){         
+            //(Forward)F =0x46  (Stand)S = 0x53  (Backward)B = 0x42
+            fall_Down_Flag = true;
         }
-        else                                    //positive
+        else if (sensor_data_buf[Sensor_Data_Count] == 0x53)     //(Forward)F =0x46  (Stand)S = 0x53 (Backward)B = 0x42
         {
-            ForceSensor_Value[i] = (int)(ForceSensor_Value_tmp[i]&0xFFFF) ;
-        }   
-        sensorpackage.ForceSensorData.push_back(ForceSensor_Value[i]);
+            fall_Down_Flag = false;
+        }
+        else
+        {
+            fall_Down_Flag = fall_Down_Flag;    
+        }
+
+    
+
+        //call sector  to  get  up
+        if( (old_fall_Down_Flag != fall_Down_Flag) && (fall_Down_Flag == true) && sensor_data_buf[Sensor_Data_Count] == 0x46)//forward fall down
+        {
+            SectorSend2FPGAFunction(forward_Sector_Number);
+            //printf("forward_Sector_Number execute ");
+        }
+        else if( (old_fall_Down_Flag != fall_Down_Flag) && (fall_Down_Flag == true) && sensor_data_buf[Sensor_Data_Count] == 0x42)//backward fall down
+        {
+            SectorSend2FPGAFunction(backward_Sector_Number);
+            //printf("backward_Sector_Number execute ");
+        }
+        else if ((old_fall_Down_Flag != fall_Down_Flag && fall_Down_Flag == false))
+        {
+            //printf("recover to  stand");
+            //here  can  add stand flag   if   code  need;
+        }
+        else
+        {
+            
+        }
+
+        */
+
+        Sensor_Data_Count+=1;
+
+        Sensor_Data_Count+=1;//jump the reserve package byte
+
+        for(int i=0; i<8; i++)
+        {
+            ForceSensor_Value_tmp[i] = ((feedback_data_buf[Sensor_Data_Count++] << 8) | (feedback_data_buf[Sensor_Data_Count++]));
+            if(ForceSensor_Value_tmp[i] & 0x8000)   //negative
+            {
+                ForceSensor_Value[i] =(((int)((ForceSensor_Value_tmp[i]) & (0x7FFF))) * (-1)) ;
+            }
+            else                                    //positive
+            {
+                ForceSensor_Value[i] = (int)(ForceSensor_Value_tmp[i]&0xFFFF) ;
+            }   
+            ForceSensor_Value_store[i] = ForceSensor_Value[i];
+            sensorpackage.ForceSensorData.push_back(ForceSensor_Value[i]);
+        }
+        for(int i=0;i<6;i++){sensorpackage.FeedbackLFData.push_back(FeedbackLF_store[i]);}
+        for(int i=0;i<6;i++){sensorpackage.FeedbackRFData.push_back(FeedbackRF_store[i]);}
+        for(int i=0;i<4;i++){sensorpackage.FeedbackLHData.push_back(FeedbackLH_store[i]);}
+        for(int i=0;i<4;i++){sensorpackage.FeedbackRHData.push_back(FeedbackRH_store[i]);}
+    }
+    else if(mode == 2)
+    {
+        for(int i=0; i<6; i++)
+        {
+            FeedbackLF_tmp[i] = ((feedback_data_buf[Sensor_Data_Count++] << 8) | (feedback_data_buf[Sensor_Data_Count++]));
+            if(FeedbackLF_tmp[i] & 0x8000)   //negative
+            {
+                FeedbackLF[i] =(((int)((FeedbackLF_tmp[i]) & (0x7FFF))) * (-1)) ;
+            }
+            else                                    //positive
+            {
+                FeedbackLF[i] = (int)(FeedbackLF_tmp[i]&0xFFFF) ;
+            }   
+            FeedbackLF_store[i] = FeedbackLF[i];
+            sensorpackage.FeedbackLFData.push_back(FeedbackLF[i]);
+        }
+        for(int i=0; i<6; i++)
+        {
+            FeedbackRF_tmp[i] = ((feedback_data_buf[Sensor_Data_Count++] << 8) | (feedback_data_buf[Sensor_Data_Count++]));
+            if(FeedbackRF_tmp[i] & 0x8000)   //negative
+            {
+                FeedbackRF[i] =(((int)((FeedbackRF_tmp[i]) & (0x7FFF))) * (-1)) ;
+            }
+            else                                    //positive
+            {
+                FeedbackRF[i] = (int)(FeedbackRF_tmp[i]&0xFFFF) ;
+            }   
+            FeedbackRF_store[i] = FeedbackRF[i];
+            sensorpackage.FeedbackRFData.push_back(FeedbackRF[i]);
+        }
+        for(int i=0;i<3;i++){sensorpackage.IMUData.push_back(IMU_Value_store[i]);}
+        for(int i=0;i<8;i++){sensorpackage.ForceSensorData.push_back(ForceSensor_Value_store[i]);}
+        for(int i=0;i<4;i++){sensorpackage.FeedbackLHData.push_back(FeedbackLH_store[i]);}
+        for(int i=0;i<4;i++){sensorpackage.FeedbackRHData.push_back(FeedbackRH_store[i]);}
+        // ROS_INFO("LF: %d,%d,%d,%d,%d,%d\n",FeedbackLF[0],FeedbackLF[1],FeedbackLF[2],FeedbackLF[3],FeedbackLF[4],FeedbackLF[5]);
+        // ROS_INFO("RF: %d,%d,%d,%d,%d,%d\n",FeedbackRF[0],FeedbackRF[1],FeedbackRF[2],FeedbackRF[3],FeedbackRF[4],FeedbackRF[5]);
+    }
+    else if(mode == 3)
+    {
+        for(int i=0; i<4; i++)
+        {
+            FeedbackLH_tmp[i] = ((feedback_hand_data_buf[Sensor_Data_Count++] << 8) | (feedback_hand_data_buf[Sensor_Data_Count++]));
+            if(FeedbackLH_tmp[i] & 0x8000)   //negative
+            {
+                FeedbackLH[i] =(((int)((FeedbackLH_tmp[i]) & (0x7FFF))) * (-1)) ;
+            }
+            else                                    //positive
+            {
+                FeedbackLH[i] = (int)(FeedbackLH_tmp[i]&0xFFFF) ;
+            }   
+            FeedbackLH_store[i] = FeedbackLH[i];
+            sensorpackage.FeedbackLHData.push_back(FeedbackLH[i]);
+        }
+        for(int i=0; i<4; i++)
+        {
+            FeedbackRH_tmp[i] = ((feedback_hand_data_buf[Sensor_Data_Count++] << 8) | (feedback_hand_data_buf[Sensor_Data_Count++]));
+            if(FeedbackRH_tmp[i] & 0x8000)   //negative
+            {
+                FeedbackRH[i] =(((int)((FeedbackRH_tmp[i]) & (0x7FFF))) * (-1)) ;
+            }
+            else                                    //positive
+            {
+                FeedbackRH[i] = (int)(FeedbackRH_tmp[i]&0xFFFF) ;
+            }   
+            FeedbackRH_store[i] = FeedbackRH[i];
+            sensorpackage.FeedbackRHData.push_back(FeedbackRH[i]);
+        }
+        for(int i=0;i<6;i++){sensorpackage.FeedbackLFData.push_back(FeedbackLF_store[i]);}
+        for(int i=0;i<6;i++){sensorpackage.FeedbackRFData.push_back(FeedbackRF_store[i]);}
+        for(int i=0;i<3;i++){sensorpackage.IMUData.push_back(IMU_Value_store[i]);}
+        for(int i=0;i<8;i++){sensorpackage.ForceSensorData.push_back(ForceSensor_Value_store[i]);}
+        // ROS_INFO("LH: %d,%d,%d,%d\n",FeedbackLH[0],FeedbackLH[1],FeedbackLH[2],FeedbackLH[3]);
+        // ROS_INFO("RH: %d,%d,%d,%d\n",FeedbackRH[0],FeedbackRH[1],FeedbackRH[2],FeedbackRH[3]);
     }
     Sensorpackage_Publish.publish(sensorpackage);
     sensorpackage.IMUData.clear();
     sensorpackage.ForceSensorData.clear();
+    sensorpackage.FeedbackLFData.clear();
+    sensorpackage.FeedbackRFData.clear();
+    sensorpackage.FeedbackLHData.clear();
+    sensorpackage.FeedbackRHData.clear();
 }
+// void Sensor_Data_Process()
+// {
+//     uint16_t Sensor_Data_tmp[11];
+//     double IMU_Value[3];
+//     uint16_t ForceSensor_Value_tmp[8];
+//     int ForceSensor_Value[8];    
+//     int Sensor_Data_Count = 3;
+//     bool isDataOk = false;
+//     tku_msgs::SensorPackage sensorpackage;
+//     std_msgs::Int16 forward_Sector_Number;
+//     forward_Sector_Number.data  = (short) 78;
+//     std_msgs::Int16 backward_Sector_Number;
+//     backward_Sector_Number.data = (short) 87; 
+
+//     isBufFull = false;
+
+//     for(int i=0; i<3; i++)
+//     {
+//         Sensor_Data_tmp[i] = ((sensor_data_buf[Sensor_Data_Count++] << 8) | (sensor_data_buf[Sensor_Data_Count++]));
+//         if(Sensor_Data_tmp[i] & 0x8000) //negative
+//         {
+//             IMU_Value[i] = (double)( ~(Sensor_Data_tmp[i] & 0x7FFF) + 1) / 100.0;
+//         }
+//         else                            //positive
+//         {
+//             IMU_Value[i] = (double)(Sensor_Data_tmp[i]) / 100.0;
+//         }
+//         sensorpackage.IMUData.push_back(IMU_Value[i]);
+//     }
+    
+//     //For fall down & get up   //Tag for search: #falldown
+//     /*
+
+//     old_fall_Down_Flag = fall_Down_Flag;
+//     if(sensor_data_buf[Sensor_Data_Count] == 0x46 || sensor_data_buf[Sensor_Data_Count] == 0x42){         
+//         //(Forward)F =0x46  (Stand)S = 0x53  (Backward)B = 0x42
+//         fall_Down_Flag = true;
+//     }
+//     else if (sensor_data_buf[Sensor_Data_Count] == 0x53)     //(Forward)F =0x46  (Stand)S = 0x53 (Backward)B = 0x42
+//     {
+//         fall_Down_Flag = false;
+//     }
+//     else
+//     {
+//         fall_Down_Flag = fall_Down_Flag;    
+//     }
+
+ 
+
+//     //call sector  to  get  up
+//     if( (old_fall_Down_Flag != fall_Down_Flag) && (fall_Down_Flag == true) && sensor_data_buf[Sensor_Data_Count] == 0x46)//forward fall down
+//     {
+//         SectorSend2FPGAFunction(forward_Sector_Number);
+//         //printf("forward_Sector_Number execute ");
+//     }
+//     else if( (old_fall_Down_Flag != fall_Down_Flag) && (fall_Down_Flag == true) && sensor_data_buf[Sensor_Data_Count] == 0x42)//backward fall down
+//     {
+//         SectorSend2FPGAFunction(backward_Sector_Number);
+//         //printf("backward_Sector_Number execute ");
+//     }
+//     else if ((old_fall_Down_Flag != fall_Down_Flag && fall_Down_Flag == false))
+//     {
+//         //printf("recover to  stand");
+//         //here  can  add stand flag   if   code  need;
+//     }
+//     else
+//     {
+        
+//     }
+
+//     */
+
+//     Sensor_Data_Count+=1;
+
+//     Sensor_Data_Count+=1;//jump the reserve package byte
+
+//     for(int i=0; i<8; i++)
+//     {
+//         ForceSensor_Value_tmp[i] = ((sensor_data_buf[Sensor_Data_Count++] << 8) | (sensor_data_buf[Sensor_Data_Count++]));
+//         if(ForceSensor_Value_tmp[i] & 0x8000)   //negative
+//         {
+//             ForceSensor_Value[i] =(((int)((ForceSensor_Value_tmp[i]) & (0x7FFF))) * (-1)) ;
+//         }
+//         else                                    //positive
+//         {
+//             ForceSensor_Value[i] = (int)(ForceSensor_Value_tmp[i]&0xFFFF) ;
+//         }   
+//         sensorpackage.ForceSensorData.push_back(ForceSensor_Value[i]);
+//     }
+//     Sensorpackage_Publish.publish(sensorpackage);
+//     sensorpackage.IMUData.clear();
+//     sensorpackage.ForceSensorData.clear();
+// }
 
 void SensorSetFunction(const tku_msgs::SensorSet &msg)
 {
@@ -1968,6 +2253,7 @@ int main(int argc, char **argv)
     ros::Subscriber motion_sub = nh.subscribe("/package/walkingdata", 1, motionCallback);
     ros::ServiceServer InterfaceReadData_service = nh.advertiseService("/package/InterfaceReadSaveMotion",InterfaceReadDataFunction);
     ros::ServiceServer InterfaceCheckSector_service = nh.advertiseService("/package/InterfaceCheckSector",InterfaceCheckSectorFunction);
+    ros::Subscriber MotorFeedback_sub = nh.subscribe("/package/MotorFeedback", 1, AskFeedback2FPGAFunction);
     
     ros::Subscriber headmotor_subscribe = nh.subscribe("/package/HeadMotor", 1000, HeadMotorFunction);
     ros::Subscriber SectorSend2FPGA_subscribe = nh.subscribe("/package/Sector", 1000, SectorSend2FPGAFunction);
