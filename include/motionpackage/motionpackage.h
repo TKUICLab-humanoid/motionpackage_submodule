@@ -52,6 +52,17 @@ typedef struct
 
 }tsRobotis;
 
+struct SensorData
+{
+    double IMU_Value[3];
+    double Accel_Value[3];
+    int ForceSensor_Value[8];
+    int FeedbackLF[6],FeedbackRF[6], FeedbackLH[4],FeedbackRH[4];
+    int now_step;
+    double com_x, com_vx;
+    double real_com_x, real_com_vx;
+};
+
 #define AX12Velocity 1016949.152542373
 #define offset1 6
 #define offset2 21
@@ -121,6 +132,7 @@ char parameterPath[20];
 int Desire_Roll = 0;
 int Desire_Pitch = 0;
 int Desire_Yaw = 0;
+struct SensorData sensor_data;
 /*int Gain_Roll = 0;
 int Gain_Pitch = 0;
 int Gain_KP = 0;

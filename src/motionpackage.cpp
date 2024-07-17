@@ -1797,12 +1797,16 @@ void Sensor_Data_Process(int mode)
 {
     uint16_t Sensor_Data_tmp[11];
     double IMU_Value[3];
+    double Accel_Value[3];
     uint16_t ForceSensor_Value_tmp[8];
     int ForceSensor_Value[8];
     uint16_t FeedbackLF_tmp[6],FeedbackRF_tmp[6], FeedbackLH_tmp[4],FeedbackRH_tmp[4];
     int FeedbackLF[6],FeedbackRF[6], FeedbackLH[4],FeedbackRH[4];    
     int Sensor_Data_Count = 3;
     bool isDataOk = false;
+    int now_step;
+    double com_x, com_vx;
+    double real_com_x, real_com_vx;
     tku_msgs::SensorPackage sensorpackage;
     std_msgs::Int16 forward_Sector_Number;
     forward_Sector_Number.data  = (short) 78;
@@ -1816,14 +1820,14 @@ void Sensor_Data_Process(int mode)
             Sensor_Data_tmp[i] = ((sensor_data_buf[Sensor_Data_Count++] << 8) | (sensor_data_buf[Sensor_Data_Count++]));
             if(Sensor_Data_tmp[i] & 0x8000) //negative
             {
-                IMU_Value[i] = (double)( ~(Sensor_Data_tmp[i] & 0x7FFF) + 1) / 100.0;
+                sensor_data.IMU_Value[i] = (double)( ~(Sensor_Data_tmp[i] & 0x7FFF) + 1) / 100.0;
             }
             else                            //positive
             {
-                IMU_Value[i] = (double)(Sensor_Data_tmp[i]) / 100.0;
+                sensor_data.IMU_Value[i] = (double)(Sensor_Data_tmp[i]) / 100.0;
             }
-            IMU_Value_store[i] = IMU_Value[i];
-            sensorpackage.IMUData.push_back(IMU_Value[i]);
+            // IMU_Value_store[i] = IMU_Value[i];
+            // sensorpackage.IMUData.push_back(IMU_Value[i]);
         }
         
         //For fall down & get up   //Tag for search: #falldown
@@ -1872,24 +1876,100 @@ void Sensor_Data_Process(int mode)
 
         Sensor_Data_Count+=1;//jump the reserve package byte
 
-        for(int i=0; i<8; i++)
+        // for(int i=0; i<8; i++)
+        // {
+        //     ForceSensor_Value_tmp[i] = ((feedback_data_buf[Sensor_Data_Count++] << 8) | (feedback_data_buf[Sensor_Data_Count++]));
+        //     if(ForceSensor_Value_tmp[i] & 0x8000)   //negative
+        //     {
+        //         ForceSensor_Value[i] =(((int)((ForceSensor_Value_tmp[i]) & (0x7FFF))) * (-1)) ;
+        //     }
+        //     else                                    //positive
+        //     {
+        //         ForceSensor_Value[i] = (int)(ForceSensor_Value_tmp[i]&0xFFFF) ;
+        //     }   
+        //     ForceSensor_Value_store[i] = ForceSensor_Value[i];
+        //     sensorpackage.ForceSensorData.push_back(ForceSensor_Value[i]);
+        // }
+
+        for(int i=0; i<3; i++)
         {
-            ForceSensor_Value_tmp[i] = ((feedback_data_buf[Sensor_Data_Count++] << 8) | (feedback_data_buf[Sensor_Data_Count++]));
-            if(ForceSensor_Value_tmp[i] & 0x8000)   //negative
+            Sensor_Data_tmp[i+3] = ((sensor_data_buf[Sensor_Data_Count++] << 8) | (sensor_data_buf[Sensor_Data_Count++]));
+            if(Sensor_Data_tmp[i+3] & 0x8000) //negative
             {
-                ForceSensor_Value[i] =(((int)((ForceSensor_Value_tmp[i]) & (0x7FFF))) * (-1)) ;
+                sensor_data.Accel_Value[i] = (double)( ~(Sensor_Data_tmp[i+3] & 0x7FFF) + 1) / 100.0;
             }
-            else                                    //positive
+            else                            //positive
             {
-                ForceSensor_Value[i] = (int)(ForceSensor_Value_tmp[i]&0xFFFF) ;
-            }   
-            ForceSensor_Value_store[i] = ForceSensor_Value[i];
-            sensorpackage.ForceSensorData.push_back(ForceSensor_Value[i]);
+                sensor_data.Accel_Value[i] = (double)(Sensor_Data_tmp[i+3]) / 100.0;
+            }
+            // sensorpackage.AccelData.push_back(Accel_Value[i]);
         }
-        for(int i=0;i<6;i++){sensorpackage.FeedbackLFData.push_back(FeedbackLF_store[i]);}
-        for(int i=0;i<6;i++){sensorpackage.FeedbackRFData.push_back(FeedbackRF_store[i]);}
-        for(int i=0;i<4;i++){sensorpackage.FeedbackLHData.push_back(FeedbackLH_store[i]);}
-        for(int i=0;i<4;i++){sensorpackage.FeedbackRHData.push_back(FeedbackRH_store[i]);}
+
+        Sensor_Data_tmp[6] = ((sensor_data_buf[Sensor_Data_Count++] << 8) | (sensor_data_buf[Sensor_Data_Count++]));
+        if(Sensor_Data_tmp[6] & 0x8000) //negative
+        {
+            sensor_data.now_step = (double)( ~(Sensor_Data_tmp[6] & 0x7FFF) + 1) / 100.0;
+        }
+        else                            //positive
+        {
+            sensor_data.now_step = (double)(Sensor_Data_tmp[6]) / 100.0;
+        }
+        // sensorpackage.NowStep = now_step;
+
+        Sensor_Data_tmp[7] = ((sensor_data_buf[Sensor_Data_Count++] << 8) | (sensor_data_buf[Sensor_Data_Count++]));
+        if(Sensor_Data_tmp[7] & 0x8000) //negative
+        {
+            sensor_data.com_x = (double)( ~(Sensor_Data_tmp[7] & 0x7FFF) + 1) / 100.0;
+        }
+        else                            //positive
+        {
+            sensor_data.com_x = (double)(Sensor_Data_tmp[7]) / 100.0;
+        }
+        // sensorpackage.ComX = com_x;
+
+        Sensor_Data_tmp[8] = ((sensor_data_buf[Sensor_Data_Count++] << 8) | (sensor_data_buf[Sensor_Data_Count++]));
+        if(Sensor_Data_tmp[8] & 0x8000) //negative
+        {
+            sensor_data.real_com_x = (double)( ~(Sensor_Data_tmp[8] & 0x7FFF) + 1) / 100.0;
+        }
+        else                            //positive
+        {
+            sensor_data.real_com_x = (double)(Sensor_Data_tmp[8]) / 100.0;
+        }
+        // sensorpackage.RealComX = real_com_x;
+
+        Sensor_Data_tmp[9] = ((sensor_data_buf[Sensor_Data_Count++] << 8) | (sensor_data_buf[Sensor_Data_Count++]));
+        if(Sensor_Data_tmp[9] & 0x8000) //negative
+        {
+            sensor_data.com_vx = (double)( ~(Sensor_Data_tmp[9] & 0x7FFF) + 1) / 100.0;
+        }
+        else                            //positive
+        {
+            sensor_data.com_vx = (double)(Sensor_Data_tmp[9]) / 100.0;
+        }
+        // sensorpackage.ComVelocityX = com_vx;
+
+        Sensor_Data_tmp[10] = ((sensor_data_buf[Sensor_Data_Count++] << 8) | (sensor_data_buf[Sensor_Data_Count++]));
+        if(Sensor_Data_tmp[10] & 0x8000) //negative
+        {
+            sensor_data.real_com_vx = (double)( ~(Sensor_Data_tmp[10] & 0x7FFF) + 1) / 100.0;
+        }
+        else                            //positive
+        {
+            sensor_data.real_com_vx = (double)(Sensor_Data_tmp[10]) / 100.0;
+        }
+        // sensorpackage.RealComVelocityX = real_com_vx;
+        
+        for(int i=0;i<8;i++)
+        {
+            sensor_data.ForceSensor_Value[i] = 0;
+        }
+
+
+        // for(int i=0;i<6;i++){sensorpackage.FeedbackLFData.push_back(FeedbackLF_store[i]);}
+        // for(int i=0;i<6;i++){sensorpackage.FeedbackRFData.push_back(FeedbackRF_store[i]);}
+        // for(int i=0;i<4;i++){sensorpackage.FeedbackLHData.push_back(FeedbackLH_store[i]);}
+        // for(int i=0;i<4;i++){sensorpackage.FeedbackRHData.push_back(FeedbackRH_store[i]);}
     }
     else if(mode == 2)
     {
@@ -1898,33 +1978,33 @@ void Sensor_Data_Process(int mode)
             FeedbackLF_tmp[i] = ((feedback_data_buf[Sensor_Data_Count++] << 8) | (feedback_data_buf[Sensor_Data_Count++]));
             if(FeedbackLF_tmp[i] & 0x8000)   //negative
             {
-                FeedbackLF[i] =(((int)((FeedbackLF_tmp[i]) & (0x7FFF))) * (-1)) ;
+                sensor_data.FeedbackLF[i] =(((int)((FeedbackLF_tmp[i]) & (0x7FFF))) * (-1)) ;
             }
             else                                    //positive
             {
-                FeedbackLF[i] = (int)(FeedbackLF_tmp[i]&0xFFFF) ;
+                sensor_data.FeedbackLF[i] = (int)(FeedbackLF_tmp[i]&0xFFFF) ;
             }   
-            FeedbackLF_store[i] = FeedbackLF[i];
-            sensorpackage.FeedbackLFData.push_back(FeedbackLF[i]);
+            // FeedbackLF_store[i] = FeedbackLF[i];
+            // sensorpackage.FeedbackLFData.push_back(FeedbackLF[i]);
         }
         for(int i=0; i<6; i++)
         {
             FeedbackRF_tmp[i] = ((feedback_data_buf[Sensor_Data_Count++] << 8) | (feedback_data_buf[Sensor_Data_Count++]));
             if(FeedbackRF_tmp[i] & 0x8000)   //negative
             {
-                FeedbackRF[i] =(((int)((FeedbackRF_tmp[i]) & (0x7FFF))) * (-1)) ;
+                sensor_data.FeedbackRF[i] =(((int)((FeedbackRF_tmp[i]) & (0x7FFF))) * (-1)) ;
             }
             else                                    //positive
             {
-                FeedbackRF[i] = (int)(FeedbackRF_tmp[i]&0xFFFF) ;
+                sensor_data.FeedbackRF[i] = (int)(FeedbackRF_tmp[i]&0xFFFF) ;
             }   
-            FeedbackRF_store[i] = FeedbackRF[i];
-            sensorpackage.FeedbackRFData.push_back(FeedbackRF[i]);
+            // FeedbackRF_store[i] = FeedbackRF[i];
+            // sensorpackage.FeedbackRFData.push_back(FeedbackRF[i]);
         }
-        for(int i=0;i<3;i++){sensorpackage.IMUData.push_back(IMU_Value_store[i]);}
-        for(int i=0;i<8;i++){sensorpackage.ForceSensorData.push_back(ForceSensor_Value_store[i]);}
-        for(int i=0;i<4;i++){sensorpackage.FeedbackLHData.push_back(FeedbackLH_store[i]);}
-        for(int i=0;i<4;i++){sensorpackage.FeedbackRHData.push_back(FeedbackRH_store[i]);}
+        // for(int i=0;i<3;i++){sensorpackage.IMUData.push_back(IMU_Value_store[i]);}
+        // for(int i=0;i<8;i++){sensorpackage.ForceSensorData.push_back(ForceSensor_Value_store[i]);}
+        // for(int i=0;i<4;i++){sensorpackage.FeedbackLHData.push_back(FeedbackLH_store[i]);}
+        // for(int i=0;i<4;i++){sensorpackage.FeedbackRHData.push_back(FeedbackRH_store[i]);}
         // ROS_INFO("LF: %d,%d,%d,%d,%d,%d\n",FeedbackLF[0],FeedbackLF[1],FeedbackLF[2],FeedbackLF[3],FeedbackLF[4],FeedbackLF[5]);
         // ROS_INFO("RF: %d,%d,%d,%d,%d,%d\n",FeedbackRF[0],FeedbackRF[1],FeedbackRF[2],FeedbackRF[3],FeedbackRF[4],FeedbackRF[5]);
     }
@@ -1935,38 +2015,90 @@ void Sensor_Data_Process(int mode)
             FeedbackLH_tmp[i] = ((feedback_hand_data_buf[Sensor_Data_Count++] << 8) | (feedback_hand_data_buf[Sensor_Data_Count++]));
             if(FeedbackLH_tmp[i] & 0x8000)   //negative
             {
-                FeedbackLH[i] =(((int)((FeedbackLH_tmp[i]) & (0x7FFF))) * (-1)) ;
+                sensor_data.FeedbackLH[i] =(((int)((FeedbackLH_tmp[i]) & (0x7FFF))) * (-1)) ;
             }
             else                                    //positive
             {
-                FeedbackLH[i] = (int)(FeedbackLH_tmp[i]&0xFFFF) ;
+                sensor_data.FeedbackLH[i] = (int)(FeedbackLH_tmp[i]&0xFFFF) ;
             }   
-            FeedbackLH_store[i] = FeedbackLH[i];
-            sensorpackage.FeedbackLHData.push_back(FeedbackLH[i]);
+            // FeedbackLH_store[i] = FeedbackLH[i];
+            // sensorpackage.FeedbackLHData.push_back(FeedbackLH[i]);
         }
         for(int i=0; i<4; i++)
         {
             FeedbackRH_tmp[i] = ((feedback_hand_data_buf[Sensor_Data_Count++] << 8) | (feedback_hand_data_buf[Sensor_Data_Count++]));
             if(FeedbackRH_tmp[i] & 0x8000)   //negative
             {
-                FeedbackRH[i] =(((int)((FeedbackRH_tmp[i]) & (0x7FFF))) * (-1)) ;
+                sensor_data.FeedbackRH[i] =(((int)((FeedbackRH_tmp[i]) & (0x7FFF))) * (-1)) ;
             }
             else                                    //positive
             {
-                FeedbackRH[i] = (int)(FeedbackRH_tmp[i]&0xFFFF) ;
+                sensor_data.FeedbackRH[i] = (int)(FeedbackRH_tmp[i]&0xFFFF) ;
             }   
-            FeedbackRH_store[i] = FeedbackRH[i];
-            sensorpackage.FeedbackRHData.push_back(FeedbackRH[i]);
+            // FeedbackRH_store[i] = FeedbackRH[i];
+            // sensorpackage.FeedbackRHData.push_back(FeedbackRH[i]);
         }
-        for(int i=0;i<6;i++){sensorpackage.FeedbackLFData.push_back(FeedbackLF_store[i]);}
-        for(int i=0;i<6;i++){sensorpackage.FeedbackRFData.push_back(FeedbackRF_store[i]);}
-        for(int i=0;i<3;i++){sensorpackage.IMUData.push_back(IMU_Value_store[i]);}
-        for(int i=0;i<8;i++){sensorpackage.ForceSensorData.push_back(ForceSensor_Value_store[i]);}
+        // for(int i=0;i<6;i++){sensorpackage.FeedbackLFData.push_back(FeedbackLF_store[i]);}
+        // for(int i=0;i<6;i++){sensorpackage.FeedbackRFData.push_back(FeedbackRF_store[i]);}
+        // for(int i=0;i<3;i++){sensorpackage.IMUData.push_back(IMU_Value_store[i]);}
+        // for(int i=0;i<8;i++){sensorpackage.ForceSensorData.push_back(ForceSensor_Value_store[i]);}
         // ROS_INFO("LH: %d,%d,%d,%d\n",FeedbackLH[0],FeedbackLH[1],FeedbackLH[2],FeedbackLH[3]);
         // ROS_INFO("RH: %d,%d,%d,%d\n",FeedbackRH[0],FeedbackRH[1],FeedbackRH[2],FeedbackRH[3]);
     }
+
+    for(int i=0;i<8;i++)
+    {
+        switch(i)
+        {
+            case 0:
+                sensorpackage.NowStep = sensor_data.now_step;
+                sensorpackage.ComX = sensor_data.com_x;
+                sensorpackage.RealComX = sensor_data.real_com_x;
+                sensorpackage.ComVelocityX = sensor_data.com_vx;
+                sensorpackage.RealComVelocityX = sensor_data.real_com_vx;
+                sensorpackage.IMUData.push_back(sensor_data.IMU_Value[i]);
+                sensorpackage.AccelData.push_back(sensor_data.Accel_Value[i]);
+                sensorpackage.FeedbackLHData.push_back(sensor_data.FeedbackLH[i]);
+                sensorpackage.FeedbackRHData.push_back(sensor_data.FeedbackRH[i]);
+                sensorpackage.FeedbackLFData.push_back(sensor_data.FeedbackLF[i]);
+                sensorpackage.FeedbackRFData.push_back(sensor_data.FeedbackRF[i]);
+                sensorpackage.ForceSensorData.push_back(sensor_data.ForceSensor_Value[i]);
+                break;
+            case 1:
+            case 2:
+            case 3:        
+                sensorpackage.IMUData.push_back(sensor_data.IMU_Value[i]);
+                sensorpackage.AccelData.push_back(sensor_data.Accel_Value[i]);
+                sensorpackage.FeedbackLHData.push_back(sensor_data.FeedbackLH[i]);
+                sensorpackage.FeedbackRHData.push_back(sensor_data.FeedbackRH[i]);
+                sensorpackage.FeedbackLFData.push_back(sensor_data.FeedbackLF[i]);
+                sensorpackage.FeedbackRFData.push_back(sensor_data.FeedbackRF[i]);
+                sensorpackage.ForceSensorData.push_back(sensor_data.ForceSensor_Value[i]);
+                break;
+            case 4:
+                sensorpackage.FeedbackLHData.push_back(sensor_data.FeedbackLH[i]);
+                sensorpackage.FeedbackRHData.push_back(sensor_data.FeedbackRH[i]);
+                sensorpackage.FeedbackLFData.push_back(sensor_data.FeedbackLF[i]);
+                sensorpackage.FeedbackRFData.push_back(sensor_data.FeedbackRF[i]);
+                sensorpackage.ForceSensorData.push_back(sensor_data.ForceSensor_Value[i]);
+                break;
+            case 5:
+            case 6:
+                sensorpackage.FeedbackLFData.push_back(sensor_data.FeedbackLF[i]);
+                sensorpackage.FeedbackRFData.push_back(sensor_data.FeedbackRF[i]);
+                sensorpackage.ForceSensorData.push_back(sensor_data.ForceSensor_Value[i]);
+                break;
+            case 7:
+            case 8:
+                sensorpackage.ForceSensorData.push_back(sensor_data.ForceSensor_Value[i]);
+                break;
+        };
+    }
+
     Sensorpackage_Publish.publish(sensorpackage);
+    // cout << sensorpackage.AccelData << endl;
     sensorpackage.IMUData.clear();
+    sensorpackage.AccelData.clear();
     sensorpackage.ForceSensorData.clear();
     sensorpackage.FeedbackLFData.clear();
     sensorpackage.FeedbackRFData.clear();
