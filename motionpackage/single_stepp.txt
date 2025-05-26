@@ -1,0 +1,70 @@
+			<section id="singlestep" style="float: left; margin-left: 0%; min-width: 300px; max-width: 350px; width: 35%;">
+				<b style="font-size: 25px;">Single Step</b>
+				<b style="font-size: 25px; display: none;" id="LongJumpTitle">_LongJump</b>
+				<br /><br />
+				<table>
+					<tr>
+						<td>COM_Y_shift</td>
+						<td><input type="text" name="com_y_swing" id="com_y_swing" value="0" style="width: 140px" onchange="changecom_y_swing_value(this.value)"></td>
+					</tr>
+					<!-- <tr>
+						<td>COM_Y_shift</td>
+						<td><input type="text" name="X_Swing" id="X_Swing" value="0" style="width: 140px" onchange="changeX_Swing_value(this.value)"></td>
+					</tr> -->
+					<tr>
+						<td>Y_Swing</td>
+						<td><input type="text" name="Y_Swing" id="Y_Swing" value="0" style="width: 140px" onchange="changeY_Swing_value(this.value)"></td>
+					</tr>
+					<!--<tr>
+						<td>Z_Swing</td>
+						<td><input type="text" name="Z_Swing" id="luZ_Swing" value="0" style="width: 140px" onchange="changeZ_Swing_value(this.value)"></td>
+					</tr>-->
+					<tr>
+						<td>Period_T</td>
+						<td><input type="text" name="Period_T" id="Period_T" value="0" style="width: 140px" onchange="changePeriod_T_value(this.value)"></td>
+					</tr>
+					<!--<tr>
+						<td>Period_T2</td>
+						<td><input type="text" name="Period_T2" id="luPeriod_T2" value="0" style="width: 140px" onchange="changePeriod_T2_value(this.value)"></td>
+					</tr>-->
+					<!--<tr>
+						<td>Sample_Time</td>
+						<td><input type="text" name="Sample_Time" id="luSample_Time" value="0" style="width: 140px" onchange="changeSample_Time_value(this.value)"></td>
+					</tr>-->
+					<tr>
+						<td>OSC_LockRange</td>
+						<td><input type="text" name="OSC_LockRange" id="OSC_LockRange" value="0" style="width: 140px" onchange="changeOSC_LockRange_value(this.value)"></td>
+					</tr>
+					<tr>
+						<td>BASE_Default_Z</td>
+						<td><input type="text" name="BASE_Default_Z" id="BASE_Default_Z" value="0" style="width: 140px" onchange="changeBASE_Default_Z_value(this.value)"></td>
+					</tr>
+					<tr>
+						<td>right_z_shift</td>
+						<td><input type="text" name="rightfoot_shift_z" id="rightfoot_shift_z" value="0" style="width: 140px" onchange="changerightfoot_shift_z_value(this.value)"></td>
+					</tr>
+					<!-- <tr>
+						<td>right_z_shift</td>
+						<td><input type="text" name="X_Swing_COM" id="X_Swing_COM" value="0" style="width: 140px" onchange="changeX_Swing_COM_value(this.value)"></td>
+					</tr> -->
+					<tr>
+						<td>BASE_LIFT_Z</td>
+						<td><input type="text" name="BASE_LIFT_Z" id="BASE_LIFT_Z" value="0" style="width: 140px" onchange="changeBASE_LIFT_Z_value(this.value)"></td>
+					</tr>
+					<tr>
+						<td>STAND_HEIGHT</td>
+						<td><input type="text" name="now_stand_height" id="now_stand_height" value="0" style="width: 140px" onchange="changenow_stand_height_value(this.value)"></td>
+					</tr>
+					<tr>
+						<td>COM_HEIGHT</td>
+						<td><input type="text" name="now_com_height" id="now_com_height" value="0" style="width: 140px" onchange="changenow_com_height_value(this.value)"></td>
+					</tr>
+				</table>
+				<tr>
+					<td><input style="margin-top: 10px " type="checkbox" name="balance" id="balance_" value="balance" ></td>
+					<td><label for="balance_">balance</label></td>
+				</tr>
+				<br />
+				<button type="button" style="width: 80px;height: 40px; margin-top: 9px;" id="sss" onclick="Save()">Save</button>
+				<button type="button" style="width: 80px;height: 40px; margin-top: 9px;" id="sss" onclick="SendParam2FPGA()">Send</button>
+			</section>

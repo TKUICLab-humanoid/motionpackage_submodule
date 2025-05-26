@@ -1,0 +1,1532 @@
+import serial
+import time
+import threading
+import binascii
+from std_msgs.msg import Int16,Bool
+from rclpy.node import Node
+from rclpy.qos import QoSProfile
+from tku_msgs.msg import SensorPackage,SensorSet,HeadPackage,InterfaceSend2Sector,SaveMotion,SaveMotionVector,Location,Parametermessage,Interface
+from tku_msgs.srv import ReadMotion,CheckSector,WalkingGaitParameter
+import rclpy
+from collections import namedtuple
+import os
+import sys
+import configparser
+import struct
+
+
+#宣告tsRobotis的資料結構
+Motor = namedtuple("Motor", ["ID", "position", "speed"])
+
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+
+from dataclasses import dataclass
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+class FootTrajectoryPlot:
+    def __init__(self):
+        plt.ion()  # 開啟互動模式
+        self.fig, self.ax = plt.subplots()
+        # 初始化左右腳軌跡線
+        self.lx_line, = self.ax.plot([], [], 'g-', label="Lx")  # 左腳 X (綠色線)
+        self.rx_line, = self.ax.plot([], [], 'm-', label="Rx")  # 右腳 X (紫色線)
+        # 初始化數據
+        self.start_time = time.time()
+        self.time = []
+        self.lx_values = []
+        self.rx_values = []
+        # 設定繪圖屬性
+        self.ax.set_xlim(0, 20)  # 時間範圍
+        self.ax.set_ylim(-5, 5)  # x 位置範圍
+        self.ax.set_title("Foot Trajectory X")
+        self.ax.set_xlabel("time (s)")
+        self.ax.set_ylabel("x (cm)")
+        self.ax.legend()
+
+    def update(self, end_point_lx_, end_point_rx_):
+        # 更新時間，每次取目前時間減去初始時間，確保是累積時間
+        current_time = time.time() - self.start_time
+        # 儲存新點
+        self.time.append(current_time)
+        self.lx_values.append(end_point_lx_)
+        self.rx_values.append(end_point_rx_)
+
+        # 更新軌跡線數據
+        self.lx_line.set_data(self.time, self.lx_values)
+        self.rx_line.set_data(self.time, self.rx_values)
+
+        # 更新繪圖範圍
+        self.ax.relim()
+        self.ax.autoscale_view()
+        plt.pause(0.05)
+
+# 初始化繪圖類別
+foot_plot = FootTrajectoryPlot()
+
+# 更新軌跡點的函式
+def plot_foot_trajectory(end_point_lx_, end_point_rx_):
+    foot_plot.update(end_point_lx_, end_point_rx_)
+
+
+@dataclass
+class GaitParameters:
+    com_y_swing: float
+    com_y_swing_range: float
+    period_t: int
+    osc_lockrange: float
+    base_default_z: float
+    now_stand_height: float
+    now_com_height: float
+    stand_balance: bool
+###### WalkingGait By LIPM ######
+
+class WalkingGaitByLIPM:
+    def __init__(self):
+        self.pre_step_ = -1
+        self.now_step_ = 0
+        self.sample_time_ = 30
+        self.lift_height_ = 3.0
+        self.board_height = 0
+        self.width_size_ = -5.0
+        self.rightfoot_shift_z = 0
+        self.period_t_ = 1200
+        self.stop = False
+        self.T_DSP_ = 0
+        self.pz_ = 24.3
+        self.Length_Leg = 23.5
+        self.Length_Pelvis = 9
+        ###
+        self.Tc_ = np.sqrt(27/9.8)/10
+        self.TT_ = self.period_t_ * 0.001
+        #我是x
+        self.step_length_ = 5
+        #我是y
+        self.shift_length_ = 0
+        self.init()
+        self.a = []
+        self.b = []
+        self.c = []
+        self.d = []
+        self.e = []
+        self.f = []
+
+    def init(self):
+        self.walking_state = 0 # StopStep:0 ,StartStep:1 ,FirstStep:2 ,Repeat:3
+        self.step_ = 9999    
+        self.left_step = 0  
+        self.right_step = 0          
+        self.footstep_x = 0
+        self.footstep_y = 0
+        self.sample_point_ = 0
+        self.t_ = 0
+        #              l  r 
+        self.now_x_ = [0 ,0]
+        self.now_y_ = [0 ,0]
+        #                      now  last
+        self.displacement_x = [0   ,0]
+        self.displacement_y = [0   ,0]
+        self.base_x         = [0   ,0]  
+        self.base_y         = [0   ,0]
+        self.zmp_x          = [0   ,0]
+        self.zmp_y          = [0   ,0]
+        self.theta          = [0   ,0]
+
+    # def update(self):
+    #     self.T_DSP_ = GaitParameters.osc_lockrange
+    #     self.period_t_ = GaitParameters.period_t
+    #     self.width_size_ = GaitParameters.com_y_swing_range#-4.5
+    #     self.lift_height_ = GaitParameters.base_default_z
+
+
+    def process(self,stop=False):
+        # self.update()
+        self.sample_point_  += 1
+        time_point_ = self.sample_point_ * self.sample_time_
+        self.t_ = ((time_point_ - self.sample_time_) % self.period_t_ + self.sample_time_)/1000
+        # print("t_"  ,self.t_)
+        self.now_step_ = int((self.sample_point_ - 1)/(self.period_t_ / self.sample_time_))
+        # print("nself.theta[0]  #ow_step_",self.now_step_)
+        
+        if self.now_step_ == self.step_:
+            self.walking_state = 0
+        elif self.now_step_ < 2:
+            self.walking_state = 1
+        elif self.now_step_ > self.step_:
+            pass
+        elif self.now_step_ == 2 :
+            self.walking_state = 2
+        else:
+            self.walking_state = 3
+        
+        if self.pre_step_ != self.now_step_:
+            if (self.now_step_ % 2) == 1 and self.now_step_ > 1:
+                self.left_step += 1
+            else:
+                self.right_step += 1
+            if self.pre_step_ == -1:
+                self.footstep_x = 0
+                self.footstep_y = -self.width_size_
+                self.now_x_[1] = self.footstep_x
+                self.now_y_[1] = -self.footstep_y
+                self.now_x_[0] = 0
+                self.now_y_[0] = self.width_size_
+            elif (self.pre_step_ % 2) == 0:
+                self.now_x_[0] = self.footstep_x
+                self.now_y_[0] = self.footstep_y
+            elif (self.pre_step_ % 2) == 1:
+                self.now_x_[1] = self.footstep_x
+                self.now_y_[1]= self.footstep_y
+
+            self.zmp_x[1] = self.zmp_x[0]
+            self.zmp_y[1] = self.zmp_y[0]
+            self.zmp_x[0] = self.footstep_x
+            self.zmp_y[0] = self.footstep_y
+            self.displacement_x[1] = self.displacement_x[0]  # 上次的跨幅
+            self.base_x[1] = self.base_x[0]  # 上次到達的位置
+            self.displacement_y[1] = self.displacement_y[0]  # 上次的Y軸位移量
+            self.base_y[1] = self.base_y[0]  # 上次的Y軸位移位置
+            self.theta[1] = self.theta[0]  # 前一次的Theta變化量
+
+            #readwalkdata
+
+            if self.walking_state == 1:
+                self.theta_ = 0
+                self.theta[0] = 0
+
+                self.now_width_ = 2 * self.width_size_ * (-pow(-1, self.now_step_ + 1))
+                self.width_x = -np.sin(self.theta_) * self.now_width_
+                self.width_y = np.cos(self.theta_) * self.now_width_
+                self.displacement_x[0] = self.width_x
+                self.displacement_y[0] = self.width_y
+                self.footstep_x += self.width_x
+                self.footstep_y += self.width_y
+
+            elif self.walking_state == 0:
+                self.theta_ = self.theta[0]
+
+                self.now_width_ = 2 * self.width_size_ * (-pow(-1, self.now_step_ + 1))
+                self.width_x = -np.sin(self.theta_) * self.now_width_
+                self.width_y = np.cos(self.theta_) * self.now_width_
+                self.displacement_x[0] = self.width_x
+                self.displacement_y[0] = self.width_y
+                self.footstep_x += self.width_x
+                self.footstep_y += self.width_y
+
+            else:
+                self.theta_ = self.theta[0]
+
+                self.now_width_ = 2 * self.width_size_ * (-pow(-1, self.now_step_ + 1))
+                self.width_x = -np.sin(self.theta_) * self.now_width_
+                self.width_y = np.cos(self.theta_) * self.now_width_
+                self.displacement_x[0] = (self.step_length_ * np.cos(self.theta_) - self.shift_length_ * np.sin(self.theta_)) + self.width_x
+                self.displacement_y[0] = (self.step_length_ * np.sin(self.theta_) + self.shift_length_ * np.cos(self.theta_)) + self.width_y
+                self.footstep_x += self.displacement_x[0]
+                self.footstep_y += self.displacement_y[0]
+
+            self.base_x[0] = (self.footstep_x + self.zmp_x[0]) / 2
+            self.base_y[0] = (self.footstep_y + self.zmp_y[0]) / 2
+
+        self.pre_step_= self.now_step_
+
+        if stop:
+            self.step = self.now_step_+1
+
+        px_, py_, lpx_, lpy_, rpx_, rpy_, lpz_, rpz_, lpt_, rpt_ = self.walkinggait(self.walking_state)
+        
+        py_u = py_
+        px_u = px_
+        # self.a.append(self.zmp_y[0])
+        # self.b.append(self.zmp_y[1])
+        # self.c.append(lpy_)
+        return self.coordinate_transformation(py_u, px_u, lpx_, lpy_, rpx_, rpy_, lpz_, rpz_, lpt_, rpt_)
+
+
+    def walkinggait(self,walking_state):
+        px_, py_, lpx_, lpy_, rpx_, rpy_, lpz_, rpz_, lpt_, rpt_ = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        if walking_state == 1:
+            vx0_ = self.wComVelocityInit(0, 0, self.zmp_x[0], self.TT_, self.Tc_)
+            px_ = self.wComPosition(0, vx0_, self.zmp_x[0], self.t_, self.Tc_)
+            vy0_ = self.wComVelocityInit(0, 0, self.zmp_y[0], self.TT_, self.Tc_)
+
+            # self.StartHeight_ = self.StartHeight_
+            if (self.now_step_ % 2) == 1:
+                py_ = self.wComPosition(0, vy0_, self.zmp_y[0], self.t_, self.Tc_)
+                lpx_ = self.zmp_x[0]
+                rpx_ = self.wFootPositionRepeat(self.now_x_[1], 0, self.t_, self.TT_, self.T_DSP_)
+                lpy_ = self.zmp_y[0]
+                rpy_ = -self.wFootPositionRepeat(self.now_y_[1], 0, self.t_, self.TT_, self.T_DSP_)
+                # print("rpy_1",rpy_)
+                lpz_ = 0
+                rpz_ = self.wFootPositionZ(self.lift_height_, self.t_, self.TT_, self.T_DSP_)
+
+                lpt_ = 0
+                rpt_ = 0
+                
+            elif (self.now_step_ % 2) == 0:
+                py_ = self.wComPosition(0, vy0_, self.zmp_y[0], self.t_, self.Tc_)
+                lpx_ = self.wFootPositionRepeat(self.now_x_[0], 0, self.t_, self.TT_, self.T_DSP_)
+                rpx_ = self.zmp_x[0]
+                lpy_ = self.wFootPositionRepeat(self.now_y_[0], 0, self.t_, self.TT_, self.T_DSP_)
+                rpy_ = self.zmp_y[0]
+                # print("rpy_0",rpy_)
+                lpz_ = self.wFootPositionZ(self.lift_height_, self.t_, self.TT_, self.T_DSP_)
+                rpz_ = 0
+
+                lpt_ = 0
+                rpt_ = 0
+
+        elif walking_state == 2:
+            vx0_ = self.wComVelocityInit(0, self.base_x[0], self.zmp_x[0], self.TT_, self.Tc_)
+            px_ = self.wComPosition(0, vx0_, self.zmp_x[0], self.t_, self.Tc_)
+            vy0_ = self.wComVelocityInit(0, self.base_y[0], self.zmp_y[0], self.TT_, self.Tc_)
+            py_ = self.wComPosition(0, vy0_, self.zmp_y[0], self.t_, self.Tc_)
+            lpx_ = self.wFootPosition(self.now_x_[0], self.displacement_x[0], self.t_, self.TT_, self.T_DSP_)
+            rpx_ = self.zmp_x[0]
+            lpy_ = self.wFootPosition(self.now_y_[0], self.displacement_y[0] - self.now_width_, self.t_, self.TT_, self.T_DSP_)
+            rpy_ = self.zmp_y[0]
+            lpz_ = self.wFootPositionZ(self.lift_height_, self.t_, self.TT_, self.T_DSP_)
+            rpz_ = 0
+
+            self.lpt_ = self.wFootTheta(-self.theta[1], 1, self.t_, self.TT_, self.T_DSP_)
+            self.rpt_ = self.wFootTheta(-self.theta[0], 0, self.t_, self.TT_, self.T_DSP_)
+
+        elif walking_state == 0:
+            vx0_ = self.wComVelocityInit(self.base_x[1], self.base_x[0], self.zmp_x[0], self.TT_, self.Tc_)
+            px_ = self.wComPosition(self.base_x[1], vx0_, self.zmp_x[0], self.t_, self.Tc_)
+            vy0_ = self.wComVelocityInit(self.base_y[1], self.base_y, self.zmp_y[0], self.TT_, self.Tc_)
+            py_ = self.wComPosition(self.base_y[1], vy0_, self.zmp_y[0], self.t_, self.Tc_)
+
+            if (self.now_step_ % 2) == 1:
+                lpx_ = self.zmp_x[0]
+                lpy_ = self.zmp_y[0]
+                rpx_ = self.wFootPosition(self.now_x_[1], (self.displacement_x[1] + self.displacement_x[0]), self.t_, self.TT_, self.T_DSP_)
+                rpy_ = self.wFootPosition(self.now_y_[1], (self.displacement_y[1] + self.displacement_y[0]), self.t_, self.TT_, self.T_DSP_)
+                lpz_ = 0
+                rpz_ = self.wFootPositionZ(self.lift_height_, self.t_, self.TT_, self.T_DSP_)
+                
+                lpt_ = 0
+                rpt_ = self.wFootTheta(-self.theta[1], 1, self.t_, self.TT_, self.T_DSP_)
+
+            elif (self.now_step_ % 2) == 0:
+                lpx_ = self.wFootPosition(self.now_x_[0], (self.displacement_x[1] + self.displacement_x[0]), self.t_, self.TT_, self.T_DSP_)
+                rpx_ = self.zmp_x[0]
+                lpy_ = self.wFootPosition(self.now_y_[0], (self.displacement_y[1] + self.displacement_y[0]), self.t_, self.TT_, self.T_DSP_)
+                rpy_ = self.zmp_y[0]
+                lpz_ = self.wFootPositionZ(self.lift_height_, self.t_, self.TT_, self.T_DSP_)
+                rpz_ = 0
+                
+                lpt_ = self.wFootTheta(-self.theta[1], 1, self.t_, self.TT_, self.T_DSP_)
+                rpt_ = 0
+
+        elif walking_state == 3:
+            vx0_ = self.wComVelocityInit(self.base_x[1], self.base_x[0], self.zmp_x[0], self.TT_, self.Tc_)
+            px_ = self.wComPosition(self.base_x[1], vx0_, self.zmp_x[0], self.t_, self.Tc_)
+            vy0_ = self.wComVelocityInit(self.base_y[1], self.base_y[0], self.zmp_y[0] ,self.TT_, self.Tc_)
+            py_ = self.wComPosition(self.base_y[1], vy0_, self.zmp_y[0], self.t_, self.Tc_)
+
+            if (self.now_step_ % 2) == 1:
+                lpx_ = self.zmp_x[0]
+                rpx_ = self.wFootPositionRepeat(self.now_x_[1], (self.displacement_x[1] + self.displacement_x[0]) / 2, self.t_, self.TT_, self.T_DSP_)
+                lpy_ = self.zmp_y[0]
+                rpy_ = self.wFootPositionRepeat(self.now_y_[1], (self.displacement_y[1] + self.displacement_y[0]) / 2, self.t_, self.TT_, self.T_DSP_)
+                lpz_ = 0
+                rpz_ = self.wFootPositionZ(self.lift_height_, self.t_, self.TT_, self.T_DSP_)
+                if self.theta[0] * self.theta[1] >= 0:
+                    lpt_ = self.wFootTheta(-self.theta[0], 0, self.t_, self.TT_, self.T_DSP_)
+                    rpt_ = self.wFootTheta(-self.theta[1], 1, self.t_, self.TT_, self.T_DSP_)
+                else:
+                    lpt_ = 0
+                    rpt_ = 0
+
+            elif (self.now_step_ % 2) == 0:
+                lpx_ = self.wFootPositionRepeat(self.now_x_[0], (self.displacement_x[1] + self.displacement_x[0]) / 2, self.t_, self.TT_, self.T_DSP_)
+                rpx_ = self.zmp_x[0]
+                lpy_ = self.wFootPositionRepeat(self.now_y_[0], (self.displacement_y[1] + self.displacement_y[0]) / 2, self.t_, self.TT_, self.T_DSP_)
+                rpy_ = self.zmp_y[0]
+                lpz_ = self.wFootPositionZ(self.lift_height_, self.t_, self.TT_, self.T_DSP_)
+                rpz_ = 0
+                if self.theta[0] * self.theta[1] >= 0:
+                    lpt_ = self.wFootTheta(-self.theta[1], 1, self.t_, self.TT_, self.T_DSP_)
+                    rpt_ = self.wFootTheta(-self.theta[0], 0, self.t_, self.TT_, self.T_DSP_)
+                else:
+                    lpt_ = 0
+                    rpt_ = 0
+
+        return px_, py_, lpx_, lpy_, rpx_, rpy_, lpz_, rpz_, lpt_, rpt_
+        
+    def coordinate_transformation(self,py_u, px_u, lpx_, lpy_, rpx_, rpy_, lpz_, rpz_, lpt_, rpt_):
+        """座標平移 W to B"""
+        step_point_lx_W_ = lpx_ - px_u
+        step_point_rx_W_ = rpx_ - px_u
+        step_point_ly_W_ = lpy_ - py_u
+        step_point_ry_W_ = rpy_ - py_u
+        step_point_lz_ = self.pz_ - lpz_
+        step_point_rz_ = self.pz_ - rpz_
+        step_point_lthta_ = -lpt_
+        step_point_rthta_ = -rpt_
+
+        """座標旋轉 W to B"""
+        cos_theta = np.cos(-self.theta_)
+        sin_theta = np.sin(-self.theta_)
+        
+        step_point_lx_ = step_point_lx_W_ * cos_theta - step_point_ly_W_ * sin_theta
+        step_point_ly_ = step_point_lx_W_ * sin_theta + step_point_ly_W_ * cos_theta
+        step_point_rx_ = step_point_rx_W_ * cos_theta - step_point_ry_W_ * sin_theta
+        step_point_ry_ = step_point_rx_W_ * sin_theta + step_point_ry_W_ * cos_theta
+
+        end_point_lx_ = step_point_lx_
+        end_point_rx_ = step_point_rx_
+        end_point_ly_ = step_point_ly_  + self.Length_Pelvis/2
+        end_point_ry_ = -step_point_ry_ + self.Length_Pelvis/2
+        end_point_lz_ = step_point_lz_ - (self.pz_ - self.Length_Leg)
+        end_point_rz_ = step_point_rz_ - (self.pz_ - self.Length_Leg)
+        end_point_lthta_ = step_point_lthta_
+        end_point_rthta_ = step_point_rthta_
+        # print("end_point_rx_",end_point_rx_, "end_point_ry_",end_point_ry_, "end_point_rz_",end_point_rz_, "end_point_lx_",end_point_lx_, "end_point_ly_",end_point_ly_, "end_point_lz_",end_point_lz_, "end_point_rthta_",end_point_rthta_, "end_point_lthta_",end_point_lthta_)
+        # print(step_point_ry_-step_point_ly_)
+        self.a.append(end_point_rx_)
+        self.b.append(step_point_ry_)
+        self.c.append(end_point_ry_)
+        self.d.append(end_point_lx_)
+        self.e.append(step_point_ly_)
+        self.f.append(end_point_ly_)
+        return end_point_rx_, end_point_ry_, end_point_rz_, end_point_lx_, end_point_ly_, end_point_lz_, end_point_rthta_, end_point_lthta_
+
+    def wComVelocityInit(self, x0, xt, px, t, T):
+        return (xt - x0 * np.cosh(t / T) + px * (np.cosh(t / T) - 1)) / (T * np.sinh(t / T))
+
+    def wComPosition(self, x0, vx0, px, t, T):
+        return x0 * np.cosh(t / T) + T * vx0 * np.sinh(t / T) - px * (np.cosh(t / T) - 1)
+
+    def wFootPosition(self, start, length, t, T, T_DSP):
+        new_T = T * (1 - T_DSP)
+        new_t = t - T * T_DSP / 2
+        omega = 2 * np.pi / new_T
+
+        if t > 0 and t <= T * T_DSP / 2:
+            return start
+        elif t > T * T_DSP / 2 and t <= T * (1 - T_DSP / 2):
+            return length * (omega * new_t - np.sin(omega * new_t)) / (2 * np.pi) + start
+        else:
+            return length + start
+
+    def wFootPositionRepeat(self, start, length, t, T, T_DSP):
+        new_T = T * (1 - T_DSP)
+        new_t = t - T * T_DSP / 2
+        omega = 2 * np.pi / new_T
+
+        if t > 0 and t <= T * T_DSP / 2:
+            return start
+        elif t >= T * T_DSP / 2 and t <= T * (1 - T_DSP / 2):
+            return 2 * length * (omega * new_t - np.sin(omega * new_t)) / (2 * np.pi) + start
+        else:
+            return 2 * length + start
+
+    def wFootPositionZ(self, height, t, T, T_DSP):
+        new_T = T * (1 - T_DSP)
+        new_t = t - T * T_DSP / 2
+        omega = 2 * np.pi / new_T
+
+        if T * T_DSP / 2 < t < T * (1 - (T_DSP / 2)):
+            return 0.5 * height * (1 - np.cos(omega * new_t))
+        else:
+            return 0
+
+    def wFootTheta(self, theta, reverse, t, T, T_DSP):
+        new_T = T * (1 - T_DSP)
+        new_t = t - T * T_DSP / 2
+        omega = 2 * np.pi / new_T
+        
+        if t > 0 and t <= T * T_DSP / 2:
+            return theta if reverse else 0
+        elif T * T_DSP / 2 < t <= T * (1 - T_DSP / 2):
+            if reverse:
+                return 0.5 * theta * (1 - np.cos(0.5 * omega * (new_t - new_T)))
+            else:
+                return 0.5 * theta * (1 - np.cos(0.5 * omega * new_t))
+        else:
+            return 0 if reverse else theta
+        
+class InverseKinematic:
+    def __init__(self):
+        self.Thta = np.zeros(22)          # 儲存計算出的角度
+        self.idex = np.zeros(22)          # 儲存馬達ID
+        self.prev_Thta = np.zeros(22)     # 儲存上一個時間步的角度
+        self.motor_values = np.zeros(22)  # 儲存轉換後的馬達刻度值
+        self.prev_motor_values = np.zeros(22)  # 前一時刻的馬達刻度值
+        self.motor_speeds = np.zeros(22)  # 儲存馬達速度（刻度/秒）
+        self.time_interval = 0.01         # 時間間隔（假設每次更新間隔為0.01秒）
+        self.a = []
+        self.b = []
+        self.walk = WalkingGaitByLIPM()
+        self.robotislist = []
+        self.RobotisListinit_walk()
+        self.serial_walk()
+        # self.motion = Motionpackage
+    def serial_walk(self):
+        self.port_name = '/dev/ttyTHS1'
+        self.baudrate = 115200
+        try:
+            self.port_walk = serial.Serial(self.port_name, self.baudrate, timeout=1)
+            threading.Thread(target=self.port_walk, daemon=True).start()
+            print(f"Port {self.port_name} is open.")
+        except serial.SerialException as e:
+            print(f"Could not open port {self.port_name}: {e}")
+
+
+    def angle_to_motor_scale(self, theta, angle_range=2 * math.pi, scale_range=4096):
+        """
+        將角度值轉換為馬達刻度值
+        """
+        return int(2048 + theta * (scale_range / angle_range))
+
+    def calculate_motor_speed(self):
+        """
+        計算馬達速度（刻度/秒）
+        """
+        # speed_trans =  32767/1023
+        all_speed_gain = 1//2
+        # self.diff_matrix = np.zeros((10,22))
+        
+        for i in range(10, 22):
+            self.difference = math.fabs(self.motor_values[i] - self.prev_motor_values[i])
+            if self.difference > 0:
+                speed = (self.difference/(4096)) * (1000/self.motion_delay)*60/0.229
+            else:
+                speed = 0
+            self.motor_speeds[i] = int(speed)
+            # print("motor_speeds",self.motor_speeds[i])
+            self.prev_motor_values[i] = self.motor_values[i]  # 更新上一刻度
+
+        return self.motor_speeds
+
+
+    def init(self, end_point_rx_, end_point_ry_, end_point_rz_, end_point_lx_, end_point_ly_, end_point_lz_, end_point_rthta_, end_point_lthta_):
+        self.l1 = 12.5
+        self.l2 = 12.5
+        self.RX_2 = end_point_rx_ * end_point_rx_
+        self.RY_2 = end_point_ry_ * end_point_ry_
+        self.RZ_2 = end_point_rz_ * end_point_rz_
+        self.LX_2 = end_point_lx_ * end_point_lx_
+        self.LY_2 = end_point_ly_ * end_point_ly_
+        self.LZ_2 = end_point_lz_ * end_point_lz_
+        self.l1_2 = self.l1 * self.l1
+        self.l2_2 = self.l2 * self.l2
+        self.l1_l2 = self.l1 + self.l2
+        self.R_Lyz = np.sqrt(self.RY_2 + self.RZ_2)
+        self.L_Lyz = np.sqrt(self.LY_2 + self.LZ_2)
+        self.R_Lxyz = np.sqrt(self.RX_2 + self.RY_2 + self.RZ_2)
+        self.L_Lxyz = np.sqrt(self.LX_2 + self.LY_2 + self.LZ_2)
+
+    def ik(self, end_point_rx_=0, end_point_ry_=0, end_point_rz_=23.5, 
+           end_point_lx_=0, end_point_ly_=0, end_point_lz_=23.5, 
+           end_point_rthta_=0, end_point_lthta_=0):
+        self.init(end_point_rx_, end_point_ry_, end_point_rz_, 
+                  end_point_lx_, end_point_ly_, end_point_lz_, 
+                  end_point_rthta_, end_point_lthta_)
+
+        # 限制距離防止超出可動範圍
+        if self.R_Lxyz > self.l1_l2:
+            self.R_Lxyz = self.l1_l2
+        if self.L_Lxyz > self.l1_l2:
+            self.L_Lxyz = self.l1_l2
+
+        self.RL_2 = self.R_Lxyz * self.R_Lxyz
+        self.LL_2 = self.L_Lxyz * self.L_Lxyz
+
+        # 左腳角度計算
+        self.Thta[10] = 0
+        self.Thta[11] = math.atan2(end_point_lz_, end_point_ly_) - np.pi/2 if end_point_ly_ != 0 else 0
+
+        if end_point_lx_ == 0:
+            self.Thta[12] = -math.acos((self.l1_2 + self.LL_2 - self.l2_2) / (2 * self.l1 * self.L_Lxyz))
+        elif end_point_lx_ > 0:
+            self.Thta[12] = -math.acos((self.l1_2 + self.LL_2 - self.l2_2) / (2 * self.l1 * self.L_Lxyz)) - math.atan2(end_point_lx_, self.L_Lyz)
+        else:
+            self.Thta[12] = np.pi/2 - math.acos((self.l1_2 + self.LL_2 - self.l2_2) / (2 * self.l1 * self.L_Lxyz)) - math.atan2(self.L_Lyz, -end_point_lx_)
+
+        self.Thta[13] = np.pi - math.acos((self.l1_2 + self.l2_2 - self.LL_2) / (2 * self.l1 * self.l2))
+        self.Thta[14] = -(self.Thta[12] + self.Thta[13])
+        self.Thta[15] = self.Thta[11]
+
+        # 右腳角度計算
+        self.Thta[16] = 0
+        self.Thta[17] = math.atan2(end_point_rz_, end_point_ry_) - np.pi/2 if end_point_ry_ != 0 else 0
+
+        if end_point_rx_ == 0:
+            self.Thta[18] = -math.acos((self.l1_2 + self.RL_2 - self.l2_2) / (2 * self.l1 * self.R_Lxyz))
+        elif end_point_rx_ > 0:
+            self.Thta[18] = -math.acos((self.l1_2 + self.RL_2 - self.l2_2) / (2 * self.l1 * self.R_Lxyz)) - math.atan2(end_point_rx_, self.R_Lyz)
+        else:
+            self.Thta[18] = np.pi/2 - math.acos((self.l1_2 + self.RL_2 - self.l2_2) / (2 * self.l1 * self.R_Lxyz)) - math.atan2(self.R_Lyz, -end_point_rx_)
+
+        self.Thta[19] = -(np.pi - math.acos((self.l1_2 + self.l2_2 - self.RL_2) / (2 * self.l1 * self.l2)))
+        self.Thta[20] = -(self.Thta[18] + self.Thta[19])-(np.pi/2)
+        self.Thta[21] =  -(self.Thta[17])
+        for i in range(1,11):
+            self.idex[i] = i
+        # 計算馬達刻度
+        for i in range(10, 22):
+            self.idex[i] = i
+            self.motor_values[i] = int(self.angle_to_motor_scale(self.Thta[i]))
+        # 計算馬達速度
+        self.motion_delay = 30#self.walk.period_t_ / self.walk.sample_time_
+        # print("motion_delay", self.motion_delay)
+        self.calculate_motor_speed()
+        self.WalkingMotorFunction()
+        # print(f"LF (角度): {self.Thta[10:16]}")
+        # print(f"LF (馬達刻度): {self.motor_values[10:16]}")
+        # print(f"RF (角度): {self.Thta[20:22]}")
+        # print(f"RF (馬達刻度): {self.motor_values[16:22]}")
+        plot_foot_trajectory(end_point_lx_, end_point_rx_)
+
+    def RobotisListinit_walk(self):
+        self.robotislist.clear()
+        for i in range(1, 22):
+            motor = Motor(ID=i, position=2048, speed=511)
+            self.robotislist.append(motor)
+    def WalkingMotorFunction(self):
+        walkPackage = [0] * 64
+        walkPackage[0] = 1  # 表示動絕對刻度
+
+        for i in range(21):
+            motor_id = int(self.idex[i])  # 提取單一整數 ID
+            motor = self.robotislist[motor_id]  # 根據 ID 索引
+            updated_motor = Motor(ID=motor.ID, position=self.motor_values[i + 1], speed=self.motor_speeds[i + 1])
+            self.robotislist[motor_id] = updated_motor
+
+            # 更新打包數據
+            walkPackage[i * 3 + 1] = self.robotislist[motor_id].ID
+            walkPackage[i * 3 + 2] = self.robotislist[motor_id].position
+            walkPackage[i * 3 + 3] = self.robotislist[motor_id].speed
+
+        # 正確格式化數據
+        data_str = f"<{','.join(map(str, walkPackage))}>\n"
+        
+        # 確認串列埠狀態並傳送數據
+        if self.port_walk and self.port_walk.is_open:
+            try:
+                self.port_walk.write(data_str.encode('utf-8'))  # 確保使用 UTF-8 編碼
+                print("Data sent:", data_str)
+            except Exception as e:
+                print(f"Error sending data: {e}")
+        else:
+            print("Serial port not open. Unable to send data.")
+
+        
+###### WalkingGait By LIPM ######
+
+
+
+class Motionpackage(Node):
+    
+    def __init__(self):
+        super().__init__('motionpackage_node')
+        qos_profile = QoSProfile(depth=1000)
+        self.sensor_data_pub    = self.create_publisher(SensorPackage, '/package/sensorpackage', qos_profile)
+        self.FPGAack_Publish    = self.create_publisher(Int16, '/package/FPGAack', qos_profile)
+        self.Desire_Roll = 0
+        self.Desire_Pitch = 0
+        self.Desire_Yaw = 0
+        self.sensor_set_sub     = self.create_subscription(SensorSet, '/sensorset', self.SensorSetFunction, 1000)   
+        self.sensor_set_sub
+        self.headmotor_sub      = self.create_subscription(HeadPackage, '/package/HeadMotor', self.HeadMotorFunction, 1000)
+        self.headmotor_sub
+        self.InterfaceSend2Sector = self.create_subscription(InterfaceSend2Sector, '/package/InterfaceSend2Sector', self.InterfaceSend2SectorFunction, 1000)
+        self.InterfaceSend2Sector
+        self.SectorSend2FPGA = self.create_subscription(Int16, '/package/Sector', self.SectorSend2FPGAFunction, 1000)
+        self.SectorSend2FPGA
+        self.InterfaceSaveData = self.create_subscription(SaveMotion, '/package/InterfaceSaveMotion', self.InterfaceSaveDataDataFunction, 1000)
+        self.InterfaceSaveData
+        ############################  location  ##############################
+        self.location_subscription = self.create_subscription(
+            Location,
+            '/location',
+            self.location_callback,
+            10
+        )
+        self.location_subscription  # prevent unused variable warning
+        ############################  location  ##############################
+        self.InterfaceReadData_service = self.create_service(ReadMotion, '/package/InterfaceReadSaveMotion', self.InterfaceReadDataFunction)
+        self.loadingwalkinggait_service = self.create_service(WalkingGaitParameter, '/web/LoadWalkingGaitParameter', self.LoadingWalkingGaitFunction)
+        self.InterfaceCheckSectorFunction_service = self.create_service(CheckSector, '/package/InterfaceCheckSector', self.InterfaceCheckSectorFunction)
+        self.InterfaceCallback_Publish = self.create_publisher(Bool, '/package/motioncallback', 1000)
+        self.ExecuteCallBack_Publish = self.create_publisher(Bool,'/package/executecallback',1000)
+        self.Continousback_sub = self.create_subscription(Bool, '/walkinggait/Continuousback', self.ContinousbackFunction, 1000)
+        self.Continousback_sub 
+        self.ChangeContinuousValue_sub = self.create_subscription(Interface, '/ChangeContinuousValue_Topic', self.ChangeContinuousValueFunction, 1000)
+        self.ChangeContinuousValue_sub
+        self.SaveWalkingGaitParameter = self.create_subscription(Parametermessage, '/web/parameter_Topic', self.SaveWalkingGaitFunction, 1000)
+        self.SaveWalkingGaitParameter
+        
+        self.motionsavedata = SaveMotionVector()
+        self.serial_imu = False
+        self.serial_head = False
+        self.serial_motor = False
+        self.serial_walk = False
+
+        self.dio_tmpstatus = 0
+        self.walkdata_receive = False
+        self.robotislist = []
+        # self.tool = Tool()
+        self.SendSectorPackage = []
+        self.packageMotorData = []
+
+        self.checkSectorPackage = []
+        self.SaveSectorPackage = []
+
+        self.interface_ack = Bool()
+        self.execut_ack = Bool()
+        self.walk = WalkingGaitByLIPM()
+        self.IK = InverseKinematic()
+        # 建立一個計時器，每 0.05 秒執行一次 update 步態
+        self.timer = self.create_timer(0.05, self.update)  # 每 50 毫秒呼叫一次
+
+    def update(self):
+        # 執行步態生成
+        end_point_rx_, end_point_ry_, end_point_rz_, end_point_lx_, end_point_ly_, end_point_lz_, end_point_rthta_, end_point_lthta_ = self.walk.process()
+
+        # 執行逆運動學計算
+        self.IK.ik(end_point_rx_, end_point_ry_, end_point_rz_, end_point_lx_, end_point_ly_, end_point_lz_, end_point_rthta_, end_point_lthta_)
+
+        # # 印出計算結果，檢查是否更新
+        # print(f"LF {self.IK.Thta[10:16]}")
+        # print(f"RF {self.IK.Thta[16:22]}")
+
+    ######################         walking      ###############################
+    def location_callback(self, msg):
+        self.location = msg.data
+        print(f"Location: {self.location}")
+
+    def LoadingWalkingGaitFunction(self, request, response):
+        print(f"Mode: {request.mode}")
+        if request.mode == 0:
+            if self.back_falg:
+                self.path = f"{self.location}/Continuous_Back.ini"
+                print(f"Path: {self.path}")
+            else:
+                self.path = f"{self.location}/{'Continuous_Parameter.ini'}"
+                print(f"Path: {self.path}")
+            config = configparser.ConfigParser()
+            config.read(self.path)
+            general = config["General"]
+
+            # 初始化儲存字典
+            self.gait_params = {
+                "com_y_swing": float(general["com_y_swing"]),
+                "y_swing_range": float(general["Y_Swing_Range"]),
+                "period_t": int(general["Period_T"]),
+                "osc_lockrange": float(general["OSC_LockRange"]),
+                "base_default_z": float(general["BASE_Default_Z"]),
+                "now_stand_height": float(general["now_stand_height"]),
+                "now_com_height": float(general["now_com_height"]),
+                "stand_balance": bool(general["Stand_Balance"])
+            }
+
+            # 使用字典自動設定回傳值
+            for key, value in self.gait_params.items():
+                setattr(response, key, value)
+            
+            print(f"Response: {response}")
+
+        elif request.mode == 3:
+            self.path = f"{self.location}/Single_Parameter.ini"
+            config = configparser.ConfigParser()
+            config.read(self.path)
+            general = config["General"]
+            # 讀取參數
+            response.x_swing_range = float(general["X_Swing_Range"])
+            response.y_swing_range = float(general["Y_Swing_Range"])
+            response.z_swing_range = float(general["Z_Swing_Range"])
+            response.period_t = int(general["Period_T"])
+            response.period_t2 = int(general["Period_T2"])
+            response.sample_time = int(general["Sample_Time"])
+            response.osc_lockrange = float(general["OSC_LockRange"])
+            response.base_default_z = float(general["BASE_Default_Z"])
+            response.x_swing_com = float(general["X_Swing_COM"])
+            response.base_lift_z = float(general["BASE_LIFT_Z"])
+            response.rightfoot_shift_z = float(general["rightfoot_shift_z"])
+            response.com_y_swing = float(general["com_y_swing"])
+            response.now_stand_height = float(general["now_stand_height"])
+            response.now_com_height = float(general["now_com_height"])
+            response.stand_balance = bool(general["Stand_Balance"])
+            print(f"Response: {response}")
+
+        elif request.mode in [1, 2]:
+            self.path = f"{self.location}/{'LCdown_Parameter.ini' if request.mode == 2 else 'LCstep_Parameter.ini'}"
+            config = configparser.ConfigParser()
+            config.read(self.path)
+            general = config["General"]
+            # 讀取參數
+            response.x_swing_range = float(general["X_Swing_Range"])
+            response.y_swing_range = float(general["Y_Swing_Range"])
+            response.z_swing_range = float(general["Z_Swing_Range"])
+            response.period_t = int(general["Period_T"])
+            response.period_t2 = int(general["Period_T2"])
+            response.sample_time = int(general["Sample_Time"])
+            response.osc_lockrange = float(general["OSC_LockRange"])
+            response.base_default_z = float(general["BASE_Default_Z"])
+            response.x_swing_com = float(general["X_Swing_COM"])
+            response.com_y_swing = float(general["Y_Swing_Shift"])
+            response.base_lift_z = float(general["BASE_LIFT_Z"])
+            response.com_y_swing = float(general["com_y_swing"])
+            response.now_stand_height = float(general["now_stand_height"])
+            response.now_com_height = float(general["now_com_height"])
+            response.stand_balance = bool(general["Stand_Balance"])
+            print(f"Response: {response}")
+
+        return response
+
+    def SaveWalkingGaitFunction(self, msg):
+        print("SaveWalkingGaitFunction")
+        print(f"Mode: {msg.mode}")
+        if msg.mode == 0:
+            if self.back_falg:
+                self.path = f"{self.location}/{'Continuous_Back.ini'}"
+                config = configparser.ConfigParser()
+                config["General"] = {
+                    "com_y_swing": msg.com_y_swing,
+                    "Y_Swing_Range": msg.y_swing_range,
+                    "Period_T": msg.period_t,
+                    "OSC_LockRange": msg.osc_lockrange,
+                    "BASE_Default_Z": msg.base_default_z,
+                    "now_stand_height": msg.now_stand_height,
+                    "now_com_height": msg.now_com_height,
+                    "Stand_Balance": msg.stand_balance
+                }
+                with open(self.path, 'w') as f:
+                    config.write(f)
+            else:
+                self.path = f"{self.location}/{'Continuous_Parameter.ini'}"
+                config = configparser.ConfigParser()
+                config["General"] = {
+                    "com_y_swing": msg.com_y_swing,
+                    "Y_Swing_Range": msg.y_swing_range,
+                    "Period_T": msg.period_t,
+                    "OSC_LockRange": msg.osc_lockrange,
+                    "BASE_Default_Z": msg.base_default_z,
+                    "now_stand_height": msg.now_stand_height,
+                    "now_com_height": msg.now_com_height,
+                    "Stand_Balance": msg.stand_balance
+                }
+                with open(self.path, 'w') as f:
+                    config.write(f)
+        elif msg.mode == 3:
+            self.path = f"{self.location}/Single_Parameter.ini"
+            config = configparser.ConfigParser()
+            config["General"] = {
+                "com_y_swing": msg.com_y_swing,
+                "Y_Swing_Range": msg.y_swing_range,
+                "Period_T": msg.period_t,
+                "OSC_LockRange": msg.osc_lockrange,
+                "BASE_Default_Z": msg.base_default_z,
+                "now_stand_height": msg.now_stand_height,
+                "now_com_height": msg.now_com_height,
+                "Stand_Balance": msg.stand_balance
+            }
+            with open(self.path, 'w') as f:
+                config.write(f)
+        elif msg.mode in [1, 2]:
+            self.path = f"{self.location}/{'LCdown_Parameter.ini' if msg.mode == 2 else 'LCstep_Parameter.ini'}"
+            config = configparser.ConfigParser()
+            config["General"] = {
+                "X_Swing_Range": msg.x_swing_range,
+                "Y_Swing_Range": msg.y_swing_range,
+                "Z_Swing_Range": msg.z_swing_range,
+                "Period_T": msg.period_t,
+                "Period_T2": msg.period_t2,
+                "Sample_Time": msg.sample_time,
+                "OSC_LockRange": msg.osc_lockrange,
+                "BASE_Default_Z": msg.base_default_z,
+                "X_Swing_COM": msg.x_swong_com,
+                "Y_Swing_Shift": msg.y_swing_shift,
+                "BASE_LIFT_Z": msg.base_lift_z,
+                "com_y_swing": msg.com_y_swing,
+                "now_stand_height": msg.now_stand_height,
+                "now_com_height": msg.now_com_height,
+                "Stand_Balance": msg.stand_balance
+            }
+            with open(self.path, 'w') as f:
+                config.write(f)
+   
+# import numpy as np
+
+    def ChangeContinuousValueFunction(self, msg):
+        print("ChangeContinuousValueFunction")
+        
+        # 儲存訊息內容
+        self.x = msg.x
+        print(f"x: {self.x}")
+        self.y = msg.y
+        print(f"y: {self.y}")
+        self.z = msg.z
+        print(f"z: {self.z}")
+        self.theta = msg.theta
+        print(f"theta: {self.theta}")
+        self.walking_mode = msg.walking_mode
+        print(f"walking_mode: {self.walking_mode}")
+        self.walking_state = msg.walking_state
+        print(f"walking_state: {self.walking_state}")
+        self.sensor_mode = msg.sensor_mode
+        print(f"sensor_mode: {self.sensor_mode}")
+
+        # 建立狀態矩陣（1x7）
+        self.state_vector = np.array([
+            self.x,
+            self.y,
+            self.z,
+            self.theta,
+            self.walking_mode,
+            self.walking_state,
+            self.sensor_mode
+        ])
+
+        # 建立 serial 封包
+        HEADER = 0xAA
+        END = 0x55
+
+        # 將資料打包成 bytes（4個 float + 3個 uint8）
+        payload = struct.pack(
+            '<ffffBBB',
+            self.x,
+            self.y,
+            self.z,
+            self.theta,
+            int(self.walking_mode),
+            int(self.walking_state),
+            int(self.sensor_mode)
+        )
+
+        # 封裝成完整封包
+        self.serial_packet = bytearray()
+        self.serial_packet.append(HEADER)
+        self.serial_packet.extend(payload)
+        self.serial_packet.append(END)
+        print(f"Serial Packet: {self.serial_packet}")
+        # 如果你有 serial port 物件，這裡可以直接寫出
+        # self.serial.write(self.serial_packet)
+
+        
+
+   
+    #################################################################
+
+    def ContinousbackFunction(self, msg):
+        print("Continuousback")
+        self.back_falg = msg.data
+    #################################################################
+
+
+    def delay(timedelay):
+        time.sleep(timedelay / 1000.0)
+
+    def RobotisListinit(self):
+        self.robotislist.clear()
+        for i in range(1, 3):
+            motor = Motor(ID=i, position=2048, speed=511)
+            self.robotislist.append(motor)
+
+    def HeadMotorFunction(self, msg):
+        HeadPackage = [0]*7
+        motor = self.robotislist[msg.id - 1]
+        updated_motor = Motor(ID=motor.ID, position=msg.position, speed=msg.speed)
+        self.robotislist[msg.id - 1] = updated_motor
+        print(self.robotislist)
+        # for i in range(2):
+        HeadPackage[0] = 1 #表示動絕對刻度
+        for i in range(2):
+            HeadPackage[i * 3 + 1] = self.robotislist[i].ID
+            HeadPackage[i * 3 + 2] = self.robotislist[i].position
+            HeadPackage[i * 3 + 3] = self.robotislist[i].speed
+        data_str = ','.join(map(str, HeadPackage))  # 轉成 "1,1430,602,2,2048,511"
+        self.serial_head.write(data_str.encode('utf-8'))  # 發送 UTF-8 編碼的字串
+        self.serial_head.write(b'\n')  # 可選擇加換行符號
+        print(len(HeadPackage))
+
+    def serial_init(self):
+        # self.port_imu = '/dev/ttyS0'
+        # self.port_head = '/dev/ttyTHS1'
+        # self.port_motor = '/dev/ttyTHS1'
+        self.port_walk = '/dev/ttyTHS1'
+        self.baudrate = 115200
+        # if not self.serial_imu:
+        #     self.serial_imu = serial.Serial(self.port_imu, self.baudrate, timeout=1)
+        #     threading.Thread(target=self.imu_port, daemon=True).start()
+        # if not self.serial_head:
+        #     try:
+        #         self.serial_head = serial.Serial(self.port_head, self.baudrate, timeout=1)
+        #         threading.Thread(target=self.head_port, daemon=True).start()
+        #         print(f"Port {self.port_head} is open.")
+        #     except serial.SerialException as e:
+        #         print(f"Could not open port {self.port_head}: {e}")
+            # self.serial_head = serial.Serial(self.port_head, self.baudrate, timeout=1)
+            # threading.Thread(target=self.head_port, daemon=True).start()
+        # if not self.serial_motor:
+        #     try:
+        #         self.serial_motor = serial.Serial(self.port_motor, self.baudrate, timeout=1)
+        #         threading.Thread(target=self.motor_port, daemon=True).start()
+        #         print(f"Port {self.port_motor} is open.")
+        #     except serial.SerialException as e:
+        #         print(f"Could not open port {self.port_motor}: {e}")
+        if not self.serial_walk:
+            try:
+                self.serial_walk = serial.Serial(self.port_walk, self.baudrate, timeout=1)
+                threading.Thread(target=self.walk_port, daemon=True).start()
+                print(f"Port {self.port_walk} is open.")
+            except serial.SerialException as e:
+                print(f"Could not open port {self.port_walk}: {e}")
+
+    def walk_port(self):
+        pass        
+
+    def imu_port(self):
+        print("imu_port")
+        while True:
+            self.AutoSensorSetFunction()
+            data = self.serial_imu.read_all()
+            print(f"Data: {data}")
+            if data.startswith(b"ST\xf7") and data.endswith(b"E"):  
+                hex_data = binascii.hexlify(data)
+                print(f"Received data: {hex_data}")
+                self.Sensor_Data_Process(data)
+            time.sleep(0.1)  
+        # pass
+    
+    def head_port(self):
+        pass
+
+    def motor_port(self):
+        FPGAack = Int16()
+        print("motor_port")
+        while True:
+            data = self.serial_motor.read_all()
+            if data:  
+                hex_data = binascii.hexlify(data)
+                bytes_list = [hex_data[i:i+2].decode() for i in range(0, len(hex_data), 2)]
+                print("FPGA is : ", ' '.join(bytes_list))
+                # print("FPGA wwwwwwwwww : ", data)
+                for i in range(len(bytes_list)):
+                    if self.dio_tmpstatus == 0:
+                        if bytes_list[i] == 'S':
+                            self.dio_tmpstatus = 1
+                    elif self.dio_tmpstatus == 1:
+                        if bytes_list[i] == 'U':
+                            self.dio_tmpstatus = 2
+                        elif bytes_list[i] == 'T':
+                            self.dio_tmpstatus = 4
+                    elif self.dio_tmpstatus == 2:
+                        self.dio_tmpstatus = 3
+                        FPGAack.data = bytes_list[i]
+                        self.FPGAack_Publish.publish(FPGAack)
+                    elif self.dio_tmpstatus == 3:
+                        if bytes_list[i] == 'E':
+                            self.dio_tmpstatus = 0
+                            # if self.walkdata_receive:
+                                # walkack.data = True
+                                # walkack_Publish.publish(walkack)
+                    elif self.dio_tmpstatus == 4:
+                        if bytes_list[i] == 'Y':
+                            InterfaceFlag = 1
+                        elif bytes_list[i] == 'N':
+                            InterfaceFlag = 0
+                            # SendSectorPackage.clear()
+                        elif bytes_list[i] == 'F5':  # 注意這裡的修改
+                            self.walkdata_receive = True
+                        else:
+                            self.walkdata_receive = False
+                        self.dio_tmpstatus = 3
+            time.sleep(0.1)
+
+    def create_sensorsetpackage(self, parameters, setopt):
+        sensorsetpackage = [0] * 12
+        sensorsetpackage[0] = 0x53
+        sensorsetpackage[1] = 0x54
+        sensorsetpackage[2] = 0xF6
+
+        for i in range(3):
+            if parameters[i] < 0:
+                parameters[i] = ~(parameters[i]) + 1
+                sensorsetpackage[3 + i * 2] = ((parameters[i] >> 8) & 0xFF) | 0x80
+                sensorsetpackage[4 + i * 2] = parameters[i] & 0xFF
+                parameters[i] = ~(parameters[i] - 1)
+            else:
+                sensorsetpackage[3 + i * 2] = (parameters[i] >> 8) & 0xFF
+                sensorsetpackage[4 + i * 2] = parameters[i] & 0xFF
+
+        sensorsetpackage[9] = setopt
+        sensorsetpackage[10] = 0  # Reserve
+        sensorsetpackage[11] = 0x45
+
+        return sensorsetpackage
+
+    def SensorSetFunction(self, msg):
+        print("SensorSetFunction")
+        # msg = SensorSet()
+        Desire_parameter = [0, 0, 0]
+        self.setopt = msg.sensor_modeset 
+        print(f"setopt: {msg.sensor_modeset}")
+        if self.setopt == 0x02:
+            print("0x02")
+            Desire_parameter[0] = msg.sensor_p
+            Desire_parameter[1] = msg.sensor_i
+            Desire_parameter[2] = msg.sensor_d
+        elif self.setopt == 0x08:
+            print("0x08")
+            Desire_parameter[0] = msg.roll
+            Desire_parameter[1] = msg.pitch
+            Desire_parameter[2] = 0
+        elif self.setopt == 0x10 or self.setopt == 0x20 or self.setopt == 0x40:
+            print("0x10 or 0x20 or 0x40")
+            Desire_parameter[0] = msg.sensor_p
+            Desire_parameter[1] = msg.sensor_i
+            Desire_parameter[2] = msg.sensor_d
+        elif self.setopt == 0x80:
+            print("0x80")
+            Desire_parameter[0] = msg.sup_f
+            Desire_parameter[1] = msg.nsup_f
+            Desire_parameter[2] = 0
+        else:
+            print("else")
+            Desire_parameter[0] = 0
+            Desire_parameter[1] = 0
+            Desire_parameter[2] = 0
+
+        sensorsetpackage = self.create_sensorsetpackage(Desire_parameter, self.setopt)
+
+        try:
+            sensorsetpackage = bytearray(sensorsetpackage)
+            self.serial_imu.write(sensorsetpackage)
+            # self.get_logger().info(f"Sent sensorsetpackage: {sensorsetpackage}")
+            # time.sleep(1)  # Add a delay to reduce the frequency of sending
+        except Exception as e:
+            print(f"Error: {e}")
+
+    def AutoSensorSetFunction(self):
+        Desire_Set = True
+        IMU_Reset = False
+        ForceState = False
+        Gain_Set = False
+
+        Desire_parameter = [self.Desire_Roll, self.Desire_Pitch, self.Desire_Yaw]
+        setopt = (Gain_Set << 3) | (ForceState << 2) | (IMU_Reset << 1) | Desire_Set
+
+        sensorsetpackage = self.create_sensorsetpackage(Desire_parameter, setopt)
+
+        try:
+            sensorsetpackage = bytearray(sensorsetpackage)
+            self.serial_imu.write(sensorsetpackage)
+            # self.get_logger().info(f"Sent sensorsetpackage: {sensorsetpackage}")
+            # time.sleep(1)  # Add a delay to reduce the frequency of sending
+        except Exception as e:
+            print(f"Error: {e}")
+
+    def Sensor_Data_Process(self, buf):
+        Sensor_Data_tmp = [0] * 11
+        IMU_Value = [0] * 3
+        Sensor_Data_Count = 3
+
+        for i in range(3):
+            # Combine the high 8 bits and the low 8 bits
+            Sensor_Data_tmp[i] = (buf[Sensor_Data_Count] << 8) | buf[Sensor_Data_Count+1]
+            # Check if the data is negative
+            if Sensor_Data_tmp[i] & 0x8000:  # If the sign bit is 1
+                # Convert the data from two's complement to its actual integer value,
+                # and then convert it to a floating-point number
+                IMU_Value[i] = ((~(Sensor_Data_tmp[i] & 0x7FFF) + 1) / 100.0)
+            else:  # If the data is positive
+                # Convert the data to a floating-point number
+                IMU_Value[i] = Sensor_Data_tmp[i] / 100.0
+            Sensor_Data_Count += 2  # Update Sensor_Data_Count
+        # Create a new SensorPackage message
+        msg = SensorPackage()
+        msg.imudata = IMU_Value  # Set the IMUData attribute to the IMU_Value array
+        # Publish the message
+        self.sensor_data_pub.publish(msg)
+
+    def motor_setPID(self, msg):
+        motorID = msg.motori
+
+        motor_P_L = msg.motor_p & 0xFF
+        motor_P_H = ((msg.motor_p)>>8) & 0xFF
+        motor_I_L = msg.motor_i & 0xFF
+        motor_I_H = ((msg.motor_i)>>8) & 0xFF
+        motor_D_L = msg.motor_d & 0xFF
+        motor_D_H = ((msg.motor_d)>>8) & 0xFF
+
+        print(f"ID:{motorID},set_P:{msg.motor_p},set_I:{msg.motor_i},set_D:{msg.motor_d}")
+        print(f"P:{msg.pflag},I:{msg.iflag},D:{msg.dflag}")
+
+        PIDpackage = [0]*14
+
+        PIDpackage[0] = 0xFF
+        PIDpackage[1] = 0xFF
+        PIDpackage[2] = 0xFD
+        PIDpackage[3] = 0x00
+        PIDpackage[4] = motorID
+        PIDpackage[5] = 0x07
+        PIDpackage[6] = 0
+        PIDpackage[7] = 0x3
+
+        if msg.Pflag:
+            PIDpackage[8]  = 0x54
+            PIDpackage[10] = motor_P_L
+            PIDpackage[11] = motor_P_H
+        elif msg.Iflag:
+            PIDpackage[8]  = 0x52
+            PIDpackage[10] = motor_I_L
+            PIDpackage[11] = motor_I_H
+        elif msg.Dflag:
+            PIDpackage[8]  = 0x50
+            PIDpackage[10] = motor_D_L
+            PIDpackage[11] = motor_D_H
+
+        PIDpackage[9] = 0
+
+        blk_size = 5 + PIDpackage[5]
+        crc_value = self.update_crc(0, PIDpackage, blk_size)
+
+        PIDpackage[12] = (crc_value << 8) >> 8
+        PIDpackage[13] = crc_value >> 8
+
+        for cnt in range(14):
+            self.serial_motor.write(PIDpackage[cnt].to_bytes(1, byteorder='big'))
+    
+    def packageinit(self):
+        self.parameterpackage = [0]*31
+        self.parameterpackage[0]    = 0x53
+        self.parameterpackage[1]    = 0x54
+        self.parameterpackage[2]    = 0xF5
+        self.parameterpackage[5]    = 6
+        self.parameterpackage[30]   = 0x45
+        self.motorpackage = [0]*19
+        self.motorpackage[0]    = 0x53
+        self.motorpackage[1]    = 0x54
+        self.motorpackage[2]    = 0xF5
+        self.motorpackage[3]    = 1
+        self.motorpackage[5]    = 3
+        self.motorpackage[18]   = 0x45
+
+    def standini(self):
+        print("Standini")
+        path = os.path.join("/home/iclab/Standmotion/sector/29.ini")
+        with open(path, 'r') as fin:
+            try:
+                
+                for line in fin:
+                    if "PackageCnt" in line:
+                        self.packagecnt = int(line.split('=')[1])
+                        print(f"PackageCnt: {self.packagecnt}")
+                    elif "Package" in line:
+                        values = line.split('=')[1].split('||')
+                        # 去掉每个值的空格并过滤掉空字符串，然后将其转换为整数
+                        values = [int(value.strip()) for value in values if value.strip().isdigit()]
+                        print(f"Package: {values}")
+                        print(type(values))  # 确认 values 的类型是列表，并且里面的元素是整数
+                        break  # 找到后就可以跳出循环（如果只需要第一个匹配）
+
+                self.packageMotorData[0:3] = [0x53, 0x54, 0xF2]
+                self.packageMotorData[3:3 + len(values)-1] = values[1:]
+                print(f"packageMotorData: {self.packageMotorData}")
+                self.serial_motor.write(self.packageMotorData)
+            except Exception as e:
+                print(f"Error: {e}")
+        print("End_LoadSector")
+        self.SendSectorPackage.clear()
+
+#########################
+# Save motion functions #
+#########################
+    def InterfaceSaveDataDataFunction(self, msg):
+        self.motionsavedata.savemotionvector.append(msg)
+        
+        if msg.saveflag:
+            print("VectorSize = ", len(self.motionsavedata.savemotionvector) - 1)
+            
+            if msg.savestate == 0:
+                print("save " + msg.name)
+                path = os.path.join("/home/iclab/motion/src/strategy/", self.location, "Parameter/", msg.name)
+            elif msg.savestate == 1:
+                print("save stand")
+                path = os.path.join("/home/iclab/Standmotion/", msg.name)
+            
+            with open(path, 'w') as fout:
+                print("Start_SaveMotion")
+                fout.write(f"VectorCnt = {len(self.motionsavedata.savemotionvector) - 1}\n")
+                
+                for motion in self.motionsavedata.savemotionvector[:-1]:
+                    fout.write(f"State = {motion.motionstate}\n")
+                    fout.write(f"ID = {motion.id}\n")
+                    
+                    if motion.motionstate == 0:
+                        self._write_motion_list(fout, motion.motionlist)
+                    else:
+                        self._write_motor_data(fout, motion.motordata)
+                
+                print("End_SaveMotion")
+                self.motionsavedata.savemotionvector.clear()
+
+    def _write_motion_list(self, fout, motionlist):
+        for j, value in enumerate(motionlist):
+            prefix = "A" if j % 2 == 0 else "D"
+            fout.write(f"{prefix}{(j // 2) + 1} = {value}")
+            if j != len(motionlist) - 1:
+                fout.write("|")
+        fout.write("\n")
+
+    def _write_motor_data(self, fout, motordata):
+        for j, value in enumerate(motordata):
+            fout.write(f"M{j + 1} = {value}")
+            if j != len(motordata) - 1:
+                fout.write("|")
+        fout.write("\n")
+#########################
+# Save motion functions #
+#########################
+
+#########################
+# Read motion functions #
+#########################
+    def InterfaceReadDataFunction(self, request, response):
+        if request.readstate == 0:
+            print("read "+request.name)
+            path = os.path.join("/home/iclab/motion/src/strategy/",self.location,"Parameter/", request.name) 
+        elif request.readstate == 1:
+            print("read stand")
+            path = os.path.join("/home/iclab/Standmotion/", request.name)
+        with open(path, 'r') as fin:
+            vector_cnt = 0
+            states = []
+            ids = []
+            relativedata_list = []
+            absolutedata_list = []
+            motion_list = []
+            current_state = None
+
+            for line in fin:
+                line = line.strip()
+                if "VectorCnt" in line:
+                    vector_cnt = int(line.split('=')[1].strip())
+                    response.vectorcnt = vector_cnt
+                elif "State" in line:
+                    current_state = int(line.split('=')[1].strip())
+                    states.append(current_state)
+                    response.motionstate = states
+                elif "ID" in line:
+                    id = int(line.split('=')[1].strip())
+                    ids.append(id)
+                    response.id = ids
+                elif current_state in [1, 2] and line.startswith("M"):
+                    m_values = [int(m_value.split('=')[1].strip()) for m_value in line.split('|')]
+                    relativedata_list.append(m_values)
+                    response.relativedata = [item for sublist in relativedata_list for item in sublist if -32768 <= item <= 32767]
+                elif current_state in [3, 4] and line.startswith("M"):
+                    m_values = [int(m_value.split('=')[1].strip()) for m_value in line.split('|')]
+                    absolutedata_list.append(m_values)
+                    response.absolutedata = [item for sublist in absolutedata_list for item in sublist if -32768 <= item <= 32767]
+                elif current_state == 0 and (line.startswith("A") or line.startswith("D")):
+                    ad_values = [int(ad_value.split('=')[1].strip()) for ad_value in line.split('|')]
+                    motion_list.append(ad_values)
+                    response.motionlist = [item for sublist in motion_list for item in sublist if -32768 <= item <= 32767]
+        return response
+#########################
+# Read motion functions #
+#########################
+
+############################
+# Execute motion functions #
+############################
+    def InterfaceCheckSectorFunction(self, request, response):
+        self.checkSectorPackage.clear()
+        print("InterfaceCheckSectorFunction")
+        self.file_name = request.data
+        print("filename: ", request.data)
+        if request.data == 29:
+            path = os.path.join("/home/iclab/Standmotion/sector/29.ini")
+        else:
+            path = os.path.join("/home/iclab/motion/src/strategy/", self.location, "Parameter/sector/", str(request.data)+".ini")
+        with open(path, 'r') as fin:
+            try:
+                for line in fin:
+                    if "PackageCnt" in line:
+                        self.packagecnt = int(line.split('=')[1])
+                        print(f"PackageCnt: {self.packagecnt}")
+                    elif "Package" in line:
+                        values = line.split('=')[1].split('||')
+                        values = [int(value.strip()) for value in values if value.strip().isdigit()]
+                        if -1 in values:
+                            response.checkflag = False
+                            print("出現 -1 跳出處理")
+                            return response
+                        else:
+                            response.checkflag = True
+                            self.checkSectorPackage = values
+                            print(f"Package: {values}")
+                            print(type(values))  
+                            break  
+                if self.checkSectorPackage[0] == 241 or 242 or 243:
+                    if self.packagecnt != 85:
+                        response.checkflag = False
+                        print("PackageCnt Error")
+                        return response
+                    print(f"Sector {request.data} is ok")
+                    print("End_LoadSector")
+                    response.checkflag = True
+                    return response
+            except Exception as e:
+                print(f"Error: {e}")
+############################
+# Execute motion functions #
+############################
+
+###################################
+# Interface Send sector functions #
+###################################
+    def InterfaceSend2SectorFunction(self, msg):
+        # print("InterfaceSend2SectorFunction")
+        self.SaveSectorPackage.append(msg.package)
+        self.len = len(self.SaveSectorPackage)
+        print(f"package: {msg.package}")
+        # 檢查列表長度是否足夠
+        if self.len >= 4 and self.SaveSectorPackage[0] == 0x53 and self.SaveSectorPackage[1] == 0x54 and self.SaveSectorPackage[self.len - 2] == 0x4E and self.SaveSectorPackage[self.len - 1] == 0x45:
+            if msg.sectorname == "29":
+                path = os.path.join("/home/iclab/Standmotion/sector/29.ini")
+            else:
+                path = os.path.join("/home/iclab/motion/src/strategy/", self.location, "Parameter/sector/", str(msg.sectorname) + ".ini")
+            
+            with open(path, 'w') as fout:
+                fout.write(f"PackageCnt = {self.SaveSectorPackage[self.len - 3]}\n")
+                fout.write(f"Package = {self.SaveSectorPackage[2]}|| ")
+                self.interface_ack.data = True
+                pkgsum = 1
+            
+                # if self.SaveSectorPackage[2] in [241, 242, 243]:
+                #     if self.SaveSectorPackage[self.len - 3] == 85:
+                #         self.interface_ack.data = True
+                #         print("Send sector is successful !!")
+                #     else:
+                #         self.interface_ack.data = False
+                #         print("PackageCnt Error")
+                self.InterfaceCallback_Publish.publish(self.interface_ack)
+            
+                for i in range(3, (self.len - 3) + 2):
+                    if self.SaveSectorPackage[2] == 242:
+                        if self.SaveSectorPackage[i + 1] == 68 and self.SaveSectorPackage[i + 2] == 89:
+                            if pkgsum in [84, 87]:
+                                pkgsum = 1
+                                self.interface_ack.data = True
+                            else:
+                                self.interface_ack.data = False
+                                print("Package Error")
+                                self.InterfaceCallback_Publish.publish(self.interface_ack)
+                        else:
+                            if i == self.SaveSectorPackage[self.len - 3] + 1:
+                                print("send sector is successful !!")
+                                self.InterfaceCallback_Publish.publish(self.interface_ack)
+                                pkgsum += 1
+                    if self.interface_ack.data == False:
+                        break
+                    fout.write(f"{self.SaveSectorPackage[i]}|| ")
+                print("End_SaveSector")
+                self.SaveSectorPackage.clear()
+###################################
+# Interface Send sector functions #
+###################################
+                
+############################ 
+# execute sector functions #
+############################
+    def SectorSend2FPGAFunction(self, msg):
+        print("SectorSend2FPGAFunction")
+        self.SendSectorPackage.clear()
+        print("SendSectorPackage")
+        if msg.data == 29:
+            path = os.path.join("/home/iclab/Standmotion/sector/29.ini")
+        else:
+            path = os.path.join("/home/iclab/motion/src/strategy/", self.location, "Parameter/sector/", str(msg.data) + ".ini")
+        with open(path,"r") as fin:
+            for line in fin:
+                if "PackageCnt" in line:
+                    self.packagecnt = int(line.split('=')[1])
+                elif "Package" in line:
+                    values = line.split('=')[1].split('||')
+                    values = [int(value.strip()) for value in values if value.strip().isdigit()]
+            if values[0] == 241:
+                self.SendSectorPackage[0:3] = [0x53, 0x54, 0xF4]
+                self.SendSectorPackage[3:3 + len(values)-1] = values[1:]
+                print(f"SendSectorPackage: {self.SendSectorPackage}")
+                self.serial_motor.write(self.SendSectorPackage)
+                self.execut_ack.data = True
+                self.ExecuteCallBack_Publish.publish(self.execut_ack)
+                print("241 Execute is finish!")
+            elif values[0] == 242:
+                self.SendSectorPackage[0:3] = [0x53, 0x54, 0xF2]
+                self.SendSectorPackage[3:3 + len(values)-1] = values[1:]
+                print(f"SendSectorPackage: {self.SendSectorPackage}")
+                self.serial_motor.write(self.SendSectorPackage)
+                self.execut_ack.data = True
+                self.ExecuteCallBack_Publish.publish(self.execut_ack)
+                print("242 Execute is finish!")
+            elif values[0] == 243:
+                self.SendSectorPackage[0:3] = [0x53, 0x54, 0xF3]
+                self.SendSectorPackage[3:3 + len(values)-1] = values[1:]
+                print(f"SendSectorPackage: {self.SendSectorPackage}")
+                self.serial_motor.write(self.SendSectorPackage)
+                self.execut_ack.data = True
+                self.ExecuteCallBack_Publish.publish(self.execut_ack)
+                print("243 Execute is finish!")
+            elif values[0] == 244:
+                motionlist_flag = True
+                cnt_tmp = 1
+                while motionlist_flag:
+                    self.packageMotorData[0:3] = [0x53, 0x54, 0xF3]
+                    for i in range(cnt_tmp, self.packagecnt):
+                        self.packageMotorData.append(self.SendSectorPackage[i])
+                        if self.SendSectorPackage[i + 1] == 68 and self.SendSectorPackage[i + 2] == 89:
+                            cnt_tmp = i + 4
+                            if self.SendSectorPackage[cnt_tmp] == 69 and self.SendSectorPackage[cnt_tmp + 1] == 78:
+                                motionlist_flag = False
+                            self.serial_motor.write(self.packageMotorData)
+                            print(f"Delay: {self.SendSectorPackage[i + 3]}")
+                            time.sleep((self.SendSectorPackage[i + 3])/1000)
+                            self.packageMotorData = self.packageMotorData[:3]
+                            break
+                self.execut_ack.data = True
+                self.ExecuteCallBack_Publish.publish(self.execut_ack)
+                print("End_LoadSector")
+        
+        print("End_LoadSector")
+        self.SendSectorPackage.clear()
+############################
+# execute sector functions #
+############################
+                
+def main():
+    rclpy.init()  # Initialize rclpy
+    motion = Motionpackage()
+    # motion.RobotisListinit()
+    # motion.serial_init()
+    # motion.packageinit()
+    # walk = WalkingGaitByLIPM()
+    # # walk.process()
+    # # walk.walkinggait()
+    # # walk.wComPosition()
+    # # walk.wComVelocityInit()
+    # # walk.coordinate_transformation()
+    # end_point_rx_, end_point_ry_, end_point_rz_, end_point_lx_, end_point_ly_, end_point_lz_, end_point_rthta_, end_point_lthta_ = walk.process()
+
+    # IK = InverseKinematic()
+    # IK.ik(end_point_rx_, end_point_ry_, end_point_rz_, end_point_lx_, end_point_ly_, end_point_lz_, end_point_rthta_, end_point_lthta_)
+
+    # motion.standini()
+
+    rclpy.spin(motion)  # Spin the node so it doesn't exit
+    # rclpy.spin(walk)
+    # rclpy.spin(IK)
+
+if __name__ == "__main__":
+    main()
