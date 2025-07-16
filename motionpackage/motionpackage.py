@@ -8,7 +8,7 @@ import rclpy.logging
 from std_msgs.msg import Int16,Bool
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
-from tku_msgs.msg import SensorPackage,SensorSet,HeadPackage,InterfaceSend2Sector,SaveMotion,SaveMotionVector,Location,Parametermessage,Interface,Dio
+from tku_msgs.msg import SensorPackage,SensorSet,HeadPackage,InterfaceSend2Sector,SaveMotion,SaveMotionVector,Location,Parametermessage,Interface,Dio,SingleMotorData
 from tku_msgs.srv import ReadMotion,CheckSector,WalkingGaitParameter
 import rclpy
 from collections import namedtuple
@@ -25,9 +25,26 @@ import toml
 import Jetson.GPIO as GPIO
 import gpiod
 import shutil
+import ctypes
+# import dynamixel_functions as dynamixel
+from dynamixel_sdk import (
+    PortHandler,
+    PacketHandler,
+    GroupSyncWrite,
+    COMM_SUCCESS,
+)
 
+ADDR_PRO_TORQUE_ENABLE      = 64
+ADDR_PRO_GOAL_POSITION      = 112
+ADDR_PRO_X_PROFILE_VELOCITY = 116
+LEN_PRO_GOAL_POSITION       = 8
+PROTOCOL_VERSION            = 2
+DXL_IDS                     = [1, 2]
 
+TORQUE_ENABLE               = 1
+TORQUE_DISABLE              = 0
 
+COMM_SUCCESS                = 0
 @dataclass
 class GaitParameters:
     com_y_swing: float
@@ -84,6 +101,10 @@ class Motionpackage(Node):
         self.Gerente
         self.Send = self.create_subscription(Bool, '/Send_parameter', self.SendtoOpenCR, 1000)
         self.Send
+
+        self.SingleMotor_sub = self.create_subscription(SingleMotorData, '/package/SingleMotorData',self.move_single_motor,1000)
+        self.SingleMotor_sub
+
         self.serial_init()
         self.start_imu_thread()
         self.standini()
@@ -112,6 +133,15 @@ class Motionpackage(Node):
         self.pre_dio_strategy = False
         self.prev_pin22_val = None
         self.lines = []
+
+        # self.port_handler   = PortHandler("/dev/ttyUSB0")
+        # self.packet_handler = PacketHandler(PROTOCOL_VERSION)
+        # self.groupwrite     = GroupSyncWrite(
+        #     self.port_handler,
+        #     self.packet_handler,
+        #     ADDR_PRO_GOAL_POSITION,
+        #     LEN_PRO_GOAL_POSITION
+        # )
 
 
     ######################         walking      ###############################
@@ -305,26 +335,55 @@ class Motionpackage(Node):
             self.robotislist.append(motor)
 
     def HeadMotorFunction(self, msg):
-        HeadPackage = [0]*7
+        # 1. 更新本地的 robotislist
         motor = self.robotislist[msg.id - 1]
-        updated_motor = Motor(ID=motor.ID, position=msg.position, speed=msg.speed)
+        updated_motor = Motor(ID=motor.ID,
+                            position=msg.position,
+                            speed=msg.speed)
         self.robotislist[msg.id - 1] = updated_motor
-        HeadPackage[0] = 246 #表示動頭部馬達
-        for i in range(2):
-            HeadPackage[i * 3 + 1] = self.robotislist[i].ID
-            HeadPackage[i * 3 + 2] = self.robotislist[i].speed
-            HeadPackage[i * 3 + 3] = self.robotislist[i].position
-        # data_str = ','.join(map(str, HeadPackage))  # 轉成 "1,1430,602,2,2048,511"
-        # self.serial_head.write(data_str.encode('utf-8'))  # 發送 UTF-8 編碼的字串
-        # self.serial_head.write(b'\n')  # 可選擇加換行符號
-        self.get_logger().debug(f"ahjdhasjkdhjak{HeadPackage}")
+
+        # 2. 確保每顆馬達 torque 已打開
+        for m in self.robotislist:
+            res, err = self.packet_handler.write1ByteTxRx(
+                self.port_handler,
+                m.ID,
+                ADDR_PRO_TORQUE_ENABLE,
+                TORQUE_ENABLE
+            )
+            if res != COMM_SUCCESS:
+                self.get_logger().error(
+                    f"[ID:{m.ID}] Enable torque failed: "
+                    f"{self.packet_handler.getTxRxResult(res)}"
+                )
+
+        # 3. 清空上一次的群組參數
+        self.groupwrite.clearParam()
+
+        # 4. 打包並加入速度＋位置
+        for m in self.robotislist:
+            param = bytearray()
+            # Profile Velocity (addr=112–115)
+            param.extend(m.speed.to_bytes(4, 'little', signed=False))
+            # Goal Position (addr=116–119)
+            param.extend(m.position.to_bytes(4, 'little', signed=True))
+
+            ok = self.groupwrite.addParam(m.ID, param)
+            if not ok:
+                self.get_logger().error(
+                    f"[ID:{m.ID}] addParam failed (len={len(param)})"
+                )
+
+        sent = self.groupwrite.txPacket()
+
+        self.groupwrite.clearParam()
 
     def serial_init(self):
-        self.port_imu  = '/dev/ttyTHS1'
-        self.port_walk = '/dev/ttyACM0' #'/dev/ttyACM0'
-        self.baudrate  = 115200
+        # --- IMU & Walk 仍用 pyserial ---
+        self.port_imu   = '/dev/ttyTHS1'
+        self.port_walk  = '/dev/ttyACM0'
+        self.baudrate   = 115200
 
-        # # IMU
+        # IMU
         try:
             self.get_logger().debug(f"Opening IMU port: {self.port_imu}")
             self.serial_imu = serial.Serial(self.port_imu, self.baudrate, timeout=1)
@@ -341,7 +400,10 @@ class Motionpackage(Node):
         # Walk
         try:
             self.get_logger().debug(f"Opening WALK port: {self.port_walk}")
-            self.serial_walk = serial.Serial(self.port_walk, self.baudrate, timeout=0.1,rtscts=True)
+            self.serial_walk = serial.Serial(
+                self.port_walk, self.baudrate,
+                timeout=0.1, rtscts=True
+            )
             time.sleep(1)
             if self.serial_walk.is_open:
                 self.get_logger().debug(f"[OK] WALK open on {self.port_walk}")
@@ -351,6 +413,58 @@ class Motionpackage(Node):
         except serial.SerialException as e:
             self.get_logger().error(f"[Serial ERROR] Walk port error: {e}")
             self.serial_walk = None
+
+        # --- HEAD (Dynamixel via U2D2) ---
+        # 只保留 device path，不用 serial.Serial
+        self.port_head_dev = '/dev/ttyUSB0'
+        self.baudrate_head = 1_000_000
+
+        try:
+            self.get_logger().debug(
+                f"Opening HEAD dynamixel port: {self.port_head_dev}"
+            )
+
+            # 1) 建 PortHandler & PacketHandler
+            self.port_handler   = PortHandler(self.port_head_dev)
+            self.packet_handler = PacketHandler(PROTOCOL_VERSION)
+
+            # 2) openPort & setBaudRate
+            if not self.port_handler.openPort():
+                raise RuntimeError(f"Failed to open port {self.port_head_dev}")
+            if not self.port_handler.setBaudRate(self.baudrate_head):
+                raise RuntimeError(f"Failed to set baudrate {self.baudrate_head}")
+
+            # 3) 建 GroupSyncWrite：從 address 112 (Profile Velocity) 開始，
+            #    長度 8 bytes (4 bytes velocity + 4 bytes position)
+            self.groupwrite = GroupSyncWrite(
+                self.port_handler,
+                self.packet_handler,
+                112,  # 112
+                8
+            )
+
+            self.get_logger().debug(f"[OK] Dynamixel on {self.port_head_dev}")
+
+            # 4) 預先 enable torque
+            for dxl_id in DXL_IDS:
+                res, err = self.packet_handler.write1ByteTxRx(
+                    self.port_handler,
+                    dxl_id,
+                    ADDR_PRO_TORQUE_ENABLE,
+                    TORQUE_ENABLE
+                )
+                if res != COMM_SUCCESS:
+                    self.get_logger().error(
+                        f"[ID:{dxl_id}] Enable torque failed: "
+                        f"{self.packet_handler.getTxRxResult(res)}"
+                    )
+
+        except Exception as e:
+            self.get_logger().error(f"[Dynamixel ERROR] {e}")
+            # 如果開 port 失敗，就把 handler 設 None，後面要記得檢查
+            self.port_handler    = None
+            self.packet_handler  = None
+            self.groupwrite      = None
 
     def start_imu_thread(self):
         self.imu_thread = threading.Thread(target=self.imu_port, daemon=True)
@@ -455,7 +569,7 @@ class Motionpackage(Node):
             ser.timeout = 0.1
             written = ser.write(buf)
             ser.flush()
-            self.get_logger().debug(f"[OpenCR] Sent {written} bytes: {list(buf)}")
+            self.get_logger().info(f"[OpenCR] Sent {written} bytes: {list(buf)}")
             acks = []
             while True:
                 line = ser.readline().decode().strip()
@@ -465,15 +579,98 @@ class Motionpackage(Node):
             self.get_logger().info(f"Standini_walk_ack : {acks}")
         except EnvironmentError:
             pass
-    # def dio(self):
-    #         msg = Dio()
-    #         raw = [GPIO.input(p) for p in self.pins]
-    #         self.get_logger().info(f"all pins status : {raw}")
-    #         self.Dio_pub.publish(msg)
-    # def destroy_node(self):
-    #     # 結束前清理 GPIO
-    #     GPIO.cleanup()
-    #     super().destroy_node()
+
+    def move_single_motor(self, msg):
+        """
+        只更新單顆馬達的封包值並寫回 now_motion.toml：
+        - speed（16-bit & 32-bit）直接覆蓋
+        - position（16-bit & 32-bit）累加舊值
+        更新完後，依照 standini 的方式重建整個資料包並送出：
+        buf = [242] + 每個 val 拆成 2 bytes(low) + 2 bytes(high) little-endian
+        """
+        now_path = "/home/iclab/Desktop/Standmotion/sector/now_motion.toml"
+
+        # 1. 讀 toml
+        try:
+            data = toml.load(now_path)
+        except Exception as e:
+            self.get_logger().error(f"載入 now_motion.toml 失敗: {e}")
+            return
+
+        pkg16 = data.get("Package", [])
+        pkg32 = data.get("Package32", [])
+
+        # 2. 檢查 16-bit 索引並更新 speed/position
+        idx_s16 = 1 + (msg.id - 1) * 2
+        idx_p16 = idx_s16 + 1
+        if idx_p16 >= len(pkg16) - 1:
+            self.get_logger().error(f"馬達 ID {msg.id} 超出 Package 範圍")
+            return
+
+        # speed 直接覆蓋，position 累加
+        old_p16   = pkg16[idx_p16]
+        new_p16   = (old_p16 + int(msg.position)) & 0xFFFF
+        pkg16[idx_s16] = int(msg.speed)    & 0xFFFF
+        pkg16[idx_p16] = new_p16
+
+        # 3. 檢查並更新 32-bit （如有需要）
+        idx32 = (msg.id - 1) * 8
+        if idx32 + 8 > len(pkg32):
+            self.get_logger().error(f"馬達 ID {msg.id} 超出 Package32 範圍")
+            return
+
+        speed_bytes = (int(msg.speed) & 0xFFFFFFFF).to_bytes(4, "little", signed=False)
+        old_pos32   = int.from_bytes(bytes(pkg32[idx32+4:idx32+8]), "little", signed=False)
+        new_pos32   = (old_pos32 + int(msg.position)) & 0xFFFFFFFF
+        pos_bytes   = new_pos32.to_bytes(4, "little", signed=False)
+
+        pkg32[idx32    : idx32+4] = list(speed_bytes)
+        pkg32[idx32+4  : idx32+8] = list(pos_bytes)
+
+        # 4. 寫回 now_motion.toml
+        data["Package"]   = pkg16
+        data["Package32"] = pkg32
+        try:
+            with open(now_path, "w") as f:
+                toml.dump(data, f)
+            self.get_logger().info(
+                f"更新完成 → ID={msg.id} | "
+                f"speed16={msg.speed}, pos16+={msg.position}→{new_p16} | "
+                f"speed32={list(speed_bytes)}, pos32+={msg.position}→{new_pos32}"
+            )
+        except Exception as e:
+            self.get_logger().error(f"寫回 now_motion.toml 失敗: {e}")
+            return
+
+        # 5. 重建要送出的 buf（同 standini）
+        payload_vals = pkg16[1:-1]            # 跳過 242 header 與最後的 footer
+        buf = bytearray([242])
+        for v in payload_vals:
+            vv = v & 0xFFFFFFFF
+            # 低 16 bit
+            buf.extend((vv & 0xFFFF).to_bytes(2, 'little', signed=False))
+            # 高 16 bit
+            buf.extend(((vv >> 16) & 0xFFFF).to_bytes(2, 'little', signed=False))
+
+        # 6. 發送給 OpenCR
+        try:
+            ser = self.serial_walk
+            ser.reset_input_buffer()
+            ser.timeout = 0.1
+            written = ser.write(buf)
+            ser.flush()
+            self.get_logger().info(f"[OpenCR] Sent {written} bytes: {list(buf)}")
+            # 讀 ack
+            acks = []
+            while True:
+                line = ser.readline().decode(errors='ignore').strip()
+                if not line:
+                    break
+                acks.append(line)
+            self.get_logger().info(f"move_single_motor_ack: {acks}")
+        except EnvironmentError as e:
+            self.get_logger().error(f"Serial write error: {e}")
+            return
 
     def dio(self):
         raw = [GPIO.input(p) for p in self.pins]
