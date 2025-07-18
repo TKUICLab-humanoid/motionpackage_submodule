@@ -330,7 +330,7 @@ class Motionpackage(Node):
 
     def RobotisListinit(self):
         self.robotislist.clear()
-        for i in range(1, 3):
+        for i in range(28, 30):
             motor = Motor(ID=i, position=2048, speed=511)
             self.robotislist.append(motor)
 
