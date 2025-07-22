@@ -16,11 +16,13 @@ setup(
     maintainer='iclab',
     maintainer_email='iclab@todo.todo',
     description='TODO: Package description',
-    license='TODO: License declaration',
-    tests_require=['pytest'],
+    license='Apache-2.0',
+    extras_require={
+        'test': ['pytest'],
+    },
     entry_points={
         'console_scripts': [
-            'motionpackage = motionpackage.motionpackage:main'
+            'motionpackage = motionpackage.motionpackage:main',
             # 'motionpackage = motionpackage.opencr_imu:main'
         ],
     },

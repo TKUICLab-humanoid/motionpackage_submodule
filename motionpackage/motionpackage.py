@@ -23,7 +23,6 @@ import numpy as np
 import select
 import toml
 import Jetson.GPIO as GPIO
-import gpiod
 import shutil
 import ctypes
 # import dynamixel_functions as dynamixel
@@ -146,7 +145,7 @@ class Motionpackage(Node):
 
     ######################         walking      ###############################
     def location_callback(self, loc):
-        self.location = f"/home/iclab/Desktop/towen/src/strategy/strategy/{loc}/Parameter"
+        self.location = f"/workspace/towen/src/strategy/strategy/{loc}/Parameter"
         self.get_logger().info(f"Location :{self.location}")
 
     def LoadingWalkingGaitFunction(self, request, response):
@@ -296,17 +295,31 @@ class Motionpackage(Node):
     #################################################################
 
     def GerenteFunction(self, msg):
+        print(f"Gerente: {msg.data}")
         packet = bytes([0x49, msg.data & 0xFF, 0x45])
+
+        # 丢掉上一次残留
         self.serial_walk.reset_input_buffer()
+
+        # 写包并 flush
         self.serial_walk.write(packet)
         self.serial_walk.flush()
+        print(f"Packet Length: {len(packet)}")
+        print(f"Packet: {packet}")
+
         line = self.serial_walk.readline().decode("utf-8").strip()
+        print(f"ACK raw: {line}")
 
     def SendtoOpenCR(self, msg):
         if not self.gait_params:
+            print("尚未載入 gait_params，請先呼叫 LoadingWalkingGaitFunction")
             return
         if not msg.data:
             return
+
+        print("SendtoOpenCR")
+
+        # 組 packet
         p = self.gait_params
         packet = struct.pack(
             '<B7f?B',
@@ -321,12 +334,19 @@ class Motionpackage(Node):
             p["stand_balance"],
             0x45
         )
+
+        # 1) 丟掉殘留
         self.serial_walk.reset_input_buffer()
+
+        # 2) 寫入並 flush
         self.serial_walk.write(packet)
-        self.get_logger().info(f"Walking_Package : {packet}")
         self.serial_walk.flush()
+        print(f"Packet Length: {len(packet)}")
+        print(f"Packet: {packet}")
+
+        # 3) 讀 ACK
         line = self.serial_walk.readline().decode("utf-8").strip()
-        self.get_logger().info(f"Walking_ack : {line}")
+        print(f"ACK raw: {line}")
 
     def RobotisListinit(self):
         self.robotislist.clear()
@@ -537,7 +557,7 @@ class Motionpackage(Node):
 
     def standini(self):
         self.get_logger().info(f"Standini")
-        path = "/home/iclab/Desktop/Standmotion/sector/29.toml"
+        path = "/workspace/Standmotion/sector/29.toml"
         backup_path = os.path.join(
             os.path.dirname(path),
             "now_motion.toml"
@@ -588,7 +608,7 @@ class Motionpackage(Node):
         更新完後，依照 standini 的方式重建整個資料包並送出：
         buf = [242] + 每個 val 拆成 2 bytes(low) + 2 bytes(high) little-endian
         """
-        now_path = "/home/iclab/Desktop/Standmotion/sector/now_motion.toml"
+        now_path = "/workspace/Standmotion/sector/now_motion.toml"
 
         # 1. 讀 toml
         try:
@@ -708,7 +728,7 @@ class Motionpackage(Node):
                 self.location
             )
         else:
-            base_dir = "/home/iclab/Desktop/Standmotion"
+            base_dir = "/workspace/Standmotion"
         fname = msg.name
         if not fname.lower().endswith(".toml"):
             fname += ".toml"
@@ -750,7 +770,7 @@ class Motionpackage(Node):
 #########################
     def InterfaceReadDataFunction(self, request, response):
         if request.readstate == 1:
-            base_dir = "/home/iclab/Desktop/Standmotion"
+            base_dir = "/workspace/Standmotion"
         elif request.readstate ==0:
             base_dir = os.path.join(
                 self.location
@@ -817,7 +837,7 @@ class Motionpackage(Node):
         sector = request.data
         self.get_logger().debug(f"InterfaceCheckSectorFunction: sector={sector}")
         if sector == 29:
-            path = "/home/iclab/Desktop/Standmotion/sector/29.toml"
+            path = "/workspace/Standmotion/sector/29.toml"
         else:
             path = os.path.join(
                 self.location,             
@@ -883,7 +903,7 @@ class Motionpackage(Node):
             self.get_logger().debug(f"package = {self.SaveSectorPackage[2]}")
             sector_name = msg.sectorname
             if sector_name == "29":
-                base_dir = "/home/iclab/Desktop/Standmotion/sector"
+                base_dir = "/workspace/Standmotion/sector"
             else:
                 base_dir = os.path.join(self.location, "sector")
             os.makedirs(base_dir, exist_ok=True)
@@ -903,7 +923,7 @@ class Motionpackage(Node):
             self.delay = msg.delay
             self.cnt = msg.cnt
             if sector_name == "29":
-                base_dir = "/home/iclab/Desktop/Standmotion/sector"
+                base_dir = "/workspace/Standmotion/sector"
             else:
                 base_dir = os.path.join(self.location, "sector")
             os.makedirs(base_dir, exist_ok=True)
@@ -939,7 +959,7 @@ class Motionpackage(Node):
             self.get_logger().debug(f"package = {self.SaveSectorPackage[2]}")
             sector_name = msg.sectorname
             if sector_name == "29":
-                base_dir = "/home/iclab/Desktop/Standmotion/sector"
+                base_dir = "/workspace/Standmotion/sector"
             else:
                 base_dir = os.path.join(self.location, "sector")
             os.makedirs(base_dir, exist_ok=True)
@@ -966,7 +986,7 @@ class Motionpackage(Node):
         sector = msg.data
         self.get_logger().debug(f"[OpenCR] SectorSend2OpenCR: sector={sector}")
         if sector == 29:
-            path = "/home/iclab/Desktop/Standmotion/sector/29.toml"
+            path = "/workspace/Standmotion/sector/29.toml"
         else:
             path = os.path.join(self.location, "sector", f"{sector}.toml")
         try:
@@ -979,7 +999,7 @@ class Motionpackage(Node):
             self.get_logger().error("Missing Package or too short")
             return
         mode     = pkg[0]
-        now_fn   = "/home/iclab/Desktop/Standmotion/sector/now_motion.toml"
+        now_fn   = "/workspace/Standmotion/sector/now_motion.toml"
         if mode == 242:
             try:
                 shutil.copyfile(path, now_fn)
@@ -1031,7 +1051,7 @@ class Motionpackage(Node):
                 self.get_logger().error(f"Merge write failed: {e}")
                 return
         elif mode == 244:
-            now_fn   = "/home/iclab/Desktop/Standmotion/sector/now_motion.toml"
+            now_fn   = "/workspace/Standmotion/sector/now_motion.toml"
             self.get_logger().debug(f"244 package :{pkg}")
             motionlist = [x for x in pkg[1:-1] if x != 0]
             self.get_logger().debug(f"motionlist package :{motionlist}")
