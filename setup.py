@@ -23,6 +23,7 @@ setup(
     entry_points={
         'console_scripts': [
             'motionpackage = motionpackage.motionpackage:main',
+            # 'motionpackage = motionpackage.motion_0725:main',
             # 'motionpackage = motionpackage.opencr_imu:main'
         ],
     },

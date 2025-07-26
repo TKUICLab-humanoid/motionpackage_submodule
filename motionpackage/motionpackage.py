@@ -38,8 +38,8 @@ ADDR_PRO_GOAL_POSITION      = 112
 ADDR_PRO_X_PROFILE_VELOCITY = 116
 LEN_PRO_GOAL_POSITION       = 8
 PROTOCOL_VERSION            = 2
-DXL_IDS                     = [1, 2]
-
+DXL_HAND_IDS                = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+DXL_HEAD_IDS                = [28, 29]
 TORQUE_ENABLE               = 1
 TORQUE_DISABLE              = 0
 
@@ -103,7 +103,8 @@ class Motionpackage(Node):
 
         self.SingleMotor_sub = self.create_subscription(SingleMotorData, '/package/SingleMotorData',self.move_single_motor,1000)
         self.SingleMotor_sub
-
+        self.robotislist = []
+        self.robotislistH = []
         self.serial_init()
         self.start_imu_thread()
         self.standini()
@@ -113,7 +114,7 @@ class Motionpackage(Node):
         self.serial_motor = False
         self.dio_tmpstatus = 0
         self.walkdata_receive = False
-        self.robotislist = []
+        
         self.SendSectorPackage = []
         self.packageMotorData = []
         self.checkSectorPackage = []
@@ -149,14 +150,19 @@ class Motionpackage(Node):
         self.get_logger().info(f"Location :{self.location}")
 
     def LoadingWalkingGaitFunction(self, request, response):
+        print(f"Mode: {request.mode}")
         if request.mode == 0:
             if self.back_falg:
                 self.path = f"{self.location}/Continuous_Back.ini"
+                print(f"Path: {self.path}")
             else:
                 self.path = f"{self.location}/{'Continuous_Parameter.ini'}"
+                print(f"Path: {self.path}")
             config = configparser.ConfigParser()
             config.read(self.path)
             general = config["General"]
+
+            # 初始化儲存字典
             self.gait_params = {
                 "com_y_swing":      float   (general["com_y_swing"]     ),
                 "y_swing_range":    float   (general["Y_Swing_Range"]   ),
@@ -167,14 +173,20 @@ class Motionpackage(Node):
                 "now_com_height":   float   (general["now_com_height"]  ),
                 "stand_balance":    bool    (general["Stand_Balance"]   )
             }
+
+            # 使用字典自動設定回傳值
             for key, value in self.gait_params.items():
                 setattr(response, key, value)
+            
+            print(f"Response: {response}")
             self.SendtoOpenCR(Bool(data=True))
+
         elif request.mode == 3:
             self.path = f"{self.location}/Single_Parameter.ini"
             config = configparser.ConfigParser()
             config.read(self.path)
             general = config["General"]
+            # 讀取參數
             response.x_swing_range = float(general["X_Swing_Range"])
             response.y_swing_range = float(general["Y_Swing_Range"])
             response.z_swing_range = float(general["Z_Swing_Range"])
@@ -190,12 +202,14 @@ class Motionpackage(Node):
             response.now_stand_height = float(general["now_stand_height"])
             response.now_com_height = float(general["now_com_height"])
             response.stand_balance = bool(general["Stand_Balance"])
+            print(f"Response: {response}")
 
         elif request.mode in [1, 2]:
             self.path = f"{self.location}/{'LCdown_Parameter.ini' if request.mode == 2 else 'LCstep_Parameter.ini'}"
             config = configparser.ConfigParser()
             config.read(self.path)
             general = config["General"]
+            # 讀取參數
             response.x_swing_range = float(general["X_Swing_Range"])
             response.y_swing_range = float(general["Y_Swing_Range"])
             response.z_swing_range = float(general["Z_Swing_Range"])
@@ -211,8 +225,13 @@ class Motionpackage(Node):
             response.now_stand_height = float(general["now_stand_height"])
             response.now_com_height = float(general["now_com_height"])
             response.stand_balance = bool(general["Stand_Balance"])
+            print(f"Response: {response}")
+
         return response
+
     def SaveWalkingGaitFunction(self, msg):
+        print("SaveWalkingGaitFunction")
+        print(f"Mode: {msg.mode}")
         if msg.mode == 0:
             if self.back_falg:
                 self.path = f"{self.location}/{'Continuous_Back.ini'}"
@@ -283,14 +302,22 @@ class Motionpackage(Node):
                 config.write(f)
    
     def ChangeContinuousValueFunction(self, msg):
+        print("ChangeContinuousValueFunction")
+        # 注意这里是 B3fB，不是 8：
         packet = struct.pack('<B3fB', 0x47, msg.x, msg.y, msg.theta, 0x45)
+        print(packet)
+
+        # 丢掉旧 ACK
         self.serial_walk.reset_input_buffer()
+        # 发送并 flush
         self.serial_walk.write(packet)
         self.serial_walk.flush()
         line = self.serial_walk.readline().decode('utf-8', errors='ignore').strip()
+        print(f"ACK raw: {line}")
 
     #################################################################
     def ContinousbackFunction(self, msg):
+        print("Continuousback")
         self.back_falg = msg.data
     #################################################################
 
@@ -350,9 +377,14 @@ class Motionpackage(Node):
 
     def RobotisListinit(self):
         self.robotislist.clear()
+        self.robotislistH.clear()
+        for i in range(1, 16):
+            motor = Motor(ID=i, position=2048, speed=511)
+            self.robotislistH.append(motor)
         for i in range(28, 30):
             motor = Motor(ID=i, position=2048, speed=511)
             self.robotislist.append(motor)
+        # self.get_logger().info(f"hand {list(self.robotislistH)},head {list(self.robotislist)}")
 
     def HeadMotorFunction(self, msg):
         # 1. 更新本地的 robotislist
@@ -371,10 +403,11 @@ class Motionpackage(Node):
                 TORQUE_ENABLE
             )
             if res != COMM_SUCCESS:
-                self.get_logger().error(
-                    f"[ID:{m.ID}] Enable torque failed: "
-                    f"{self.packet_handler.getTxRxResult(res)}"
-                )
+                # self.get_logger().error(
+                #     f"[ID:{m.ID}] Enable torque failed: "
+                #     f"{self.packet_handler.getTxRxResult(res)}"
+                # )
+                pass
 
         # 3. 清空上一次的群組參數
         self.groupwrite.clearParam()
@@ -389,15 +422,17 @@ class Motionpackage(Node):
 
             ok = self.groupwrite.addParam(m.ID, param)
             if not ok:
-                self.get_logger().error(
-                    f"[ID:{m.ID}] addParam failed (len={len(param)})"
-                )
+                # self.get_logger().error(
+                #     f"[ID:{m.ID}] addParam failed (len={len(param)})"
+                # )
+                pass
 
         sent = self.groupwrite.txPacket()
-
+        self.get_logger().info(f"Get : {self.robotislist}")
         self.groupwrite.clearParam()
 
     def serial_init(self):
+        self.get_logger().debug(f"Begin serial ini")
         # --- IMU & Walk 仍用 pyserial ---
         self.port_imu   = '/dev/ttyTHS1'
         self.port_walk  = '/dev/ttyACM0'
@@ -466,7 +501,7 @@ class Motionpackage(Node):
             self.get_logger().debug(f"[OK] Dynamixel on {self.port_head_dev}")
 
             # 4) 預先 enable torque
-            for dxl_id in DXL_IDS:
+            for dxl_id in DXL_HAND_IDS:
                 res, err = self.packet_handler.write1ByteTxRx(
                     self.port_handler,
                     dxl_id,
@@ -474,10 +509,11 @@ class Motionpackage(Node):
                     TORQUE_ENABLE
                 )
                 if res != COMM_SUCCESS:
-                    self.get_logger().error(
-                        f"[ID:{dxl_id}] Enable torque failed: "
-                        f"{self.packet_handler.getTxRxResult(res)}"
-                    )
+                    # self.get_logger().error(
+                    #     f"[ID:{dxl_id}] Enable torque failed: "
+                    #     f"{self.packet_handler.getTxRxResult(res)}"
+                    # )
+                    pass
 
         except Exception as e:
             self.get_logger().error(f"[Dynamixel ERROR] {e}")
@@ -555,28 +591,77 @@ class Motionpackage(Node):
         self.motorpackage[5]    = 3
         self.motorpackage[18]   = 0x45
 
-    def standini(self):
-        self.get_logger().info(f"Standini")
-        path = "/workspace/Standmotion/sector/29.toml"
-        backup_path = os.path.join(
-            os.path.dirname(path),
-            "now_motion.toml"
-        )
-        try:
-            shutil.copyfile(path, backup_path)
-            self.get_logger().debug(f"Backed up TOML as {backup_path}")
-        except Exception as e:
-            self.get_logger().error(f"Backup failed: {e}")
-        try:
-            data = toml.load(path)
-        except Exception as e:
-            self.get_logger().error(f"Cannot load TOML '{path}': {e}")
-            return
+    def send_hand(self,msg):
+        # 1. 更新本地的 robotislist
+        for idx in range(15):
+            speed, position = msg[idx]
+            motor = self.robotislistH[idx]
+            updated_motor = Motor(
+                ID=motor.ID,
+                position=position,
+                speed=speed
+            )
+            self.robotislistH[idx] = updated_motor
+        # 2. 確保每顆馬達 torque 已打開
+        for m in self.robotislistH:
+            res, err = self.packet_handler.write1ByteTxRx(
+                self.port_handler,
+                m.ID,
+                ADDR_PRO_TORQUE_ENABLE,
+                TORQUE_ENABLE
+            )
+            if res != COMM_SUCCESS:
+                # self.get_logger().error(
+                #     f"[ID:{m.ID}] Enable torque failed: "
+                #     f"{self.packet_handler.getTxRxResult(res)}"
+                # )
+                pass
 
-        pkg16 = data.get("Package", [])
-        if not isinstance(pkg16, list) or len(pkg16) < 3:
-            self.get_logger().error("Missing Package or too short")
-            return
+        # 3. 清空上一次的群組參數
+        self.groupwrite.clearParam()
+
+        # 4. 打包並加入速度＋位置
+        for m in self.robotislistH:
+            param = bytearray()
+            # Profile Velocity (addr=112–115)
+            param.extend(m.speed.to_bytes(4, 'little', signed=False))
+            # Goal Position (addr=116–119)
+            param.extend(m.position.to_bytes(4, 'little', signed=True))
+
+            ok = self.groupwrite.addParam(m.ID, param)
+            if not ok:
+                self.get_logger().error(
+                    f"[ID:{m.ID}] addParam failed (len={len(param)})"
+                )
+
+        sent = self.groupwrite.txPacket()
+        # self.get_logger().info(f"Get : {self.robotislistH}")
+        self.groupwrite.clearParam()
+
+    def standini(self):
+        self.RobotisListinit()
+        self.get_logger().info(f"Standini")
+        # path = "/workspace/Standmotion/sector/29.toml"
+        # backup_path = os.path.join(
+        #     os.path.dirname(path),
+        #     "now_motion.toml"
+        # )
+        # try:
+        #     shutil.copyfile(path, backup_path)
+        #     self.get_logger().debug(f"Backed up TOML as {backup_path}")
+        # except Exception as e:
+        #     self.get_logger().error(f"Backup failed: {e}")
+        # try:
+        #     data = toml.load(path)
+        # except Exception as e:
+        #     self.get_logger().error(f"Cannot load TOML '{path}': {e}")
+        #     return
+
+        # pkg16 = data.get("Package", [])
+        # if not isinstance(pkg16, list) or len(pkg16) < 3:
+        #     self.get_logger().error("Missing Package or too short")
+        #     return
+        handpkg,pkg16 = self.load_packets_from_toml()
         payload_vals = pkg16[1:-1]
         buf = bytearray([242])
         for val in payload_vals:
@@ -589,7 +674,8 @@ class Motionpackage(Node):
             ser.timeout = 0.1
             written = ser.write(buf)
             ser.flush()
-            self.get_logger().info(f"[OpenCR] Sent {written} bytes: {list(buf)}")
+            self.send_hand(handpkg)
+            # self.get_logger().info(f"[OpenCR] Sent {written} bytes: {list(buf)}")
             acks = []
             while True:
                 line = ser.readline().decode().strip()
@@ -597,8 +683,64 @@ class Motionpackage(Node):
                     break
                 acks.append(line)
             self.get_logger().info(f"Standini_walk_ack : {acks}")
+            # self.load_packets_from_toml()
         except EnvironmentError:
             pass
+
+    def load_packets_from_toml(self):
+        # 1. 讀 toml
+        path = "/workspace/Standmotion/sector/now_motion.toml"
+        data = toml.load(path)
+        pkg = data.get("Package", [])
+        if len(pkg) < 2:
+            raise ValueError("Package 欄位不足")
+
+        # 2. 去掉原本的 header/footer
+        payload = pkg[1:-1]  # 54 個值
+
+        # 3. 切成前 15 顆 (15*2=30 值) 與後 12 顆 (12*2=24 值)
+        group1_vals = payload[:15*2]
+        group2_vals = payload[15*2:]
+
+        # 4a. 低一組：只把每個值截成 16 bit，沒有 header/footer
+        def make_packet_group1(vals):
+            buf = bytearray()
+            for v in vals:
+                u16 = v & 0xFFFF
+                buf.extend(u16.to_bytes(2, 'little'))
+            motor_value = []
+            for i in range(15):
+                offset = i*4
+                spd=int.from_bytes(buf[offset:offset+2], byteorder="little", signed=False)
+                pos=int.from_bytes(buf[offset+2:offset+4], byteorder="little", signed=False)
+                motor_value.append((spd,pos))
+            return motor_value
+
+        # 4b. 高一組：維持原本 header/footer + 32 bit 拆成兩段 16 bit
+        def make_packet_group2(vals):
+            buf = bytearray([0xF2])  # header
+            for v in vals:
+                u32 = v & 0xFFFFFFFF
+                buf.extend((u32 & 0xFFFF).to_bytes(2, 'little'))        # 低 16 bit
+                buf.extend(((u32 >> 16) & 0xFFFF).to_bytes(2, 'little')) # 高 16 bit
+            buf.append(0x4E)  # footer
+            return buf
+
+        pkt1 = make_packet_group1(group1_vals)  # 低一組：只有資料
+        pkt2 = make_packet_group2(group2_vals)  # 高一組：含 242/78
+
+        # 5. 在需要的地方，你依然可以轉成十進制 list 來檢查
+        # self.get_logger().info(f"pkg packet: {list(pkg)}")
+        # self.get_logger().info(f"group1 packet (dec, no header/footer): {list(pkt1)}")
+        # self.get_logger().info(f"group2 packet (dec): {list(pkt2)}")
+
+        # 6. 回傳兩組封包
+        return [pkt1, pkt2]
+
+
+
+
+
 
     def move_single_motor(self, msg):
         """
@@ -653,7 +795,7 @@ class Motionpackage(Node):
         try:
             with open(now_path, "w") as f:
                 toml.dump(data, f)
-            self.get_logger().info(
+            self.get_logger().debug(
                 f"更新完成 → ID={msg.id} | "
                 f"speed16={msg.speed}, pos16+={msg.position}→{new_p16} | "
                 f"speed32={list(speed_bytes)}, pos32+={msg.position}→{new_pos32}"
@@ -1003,7 +1145,7 @@ class Motionpackage(Node):
         if mode == 242:
             try:
                 shutil.copyfile(path, now_fn)
-                self.get_logger().debug(f"Backed up TOML as {now_fn}")
+                # self.get_logger().info(f"242 Backed up TOML as {now_fn}")
                 merged_pkg = pkg[:]
             except Exception as e:
                 self.get_logger().error(f"Backup failed: {e}")
@@ -1011,6 +1153,7 @@ class Motionpackage(Node):
         elif mode == 243:
             try:
                 prev_data   = toml.load(now_fn)
+                # self.get_logger().info(f"243 Backed up TOML as {now_fn}")
             except Exception as e:
                 self.get_logger().error(f"Cannot load existing now_motion: {e}")
                 return
@@ -1064,12 +1207,13 @@ class Motionpackage(Node):
                 path = os.path.join(self.location, "sector", f"{motion_id[a]}_id.toml")
                 try:
                     data = toml.load(path)
+                    # self.get_logger().info(f"motionlist from  :{data}")
                 except Exception as e:
                     self.get_logger().error(f"Cannot load TOML '{path}': {e}")
                     return
-                self.get_logger().debug(f"path :{data}")
                 try:
                     prev_data   = toml.load(now_fn)
+                    # self.get_logger().info(f"prev_data :{prev_data}")
                 except Exception as e:
                     self.get_logger().error(f"Cannot load existing now_motion: {e}")
                     return
@@ -1110,13 +1254,14 @@ class Motionpackage(Node):
                 except Exception as e:
                     self.get_logger().error(f"Merge write failed: {e}")
                     return
+                handpkg,merged_pkg = self.load_packets_from_toml()
                 header       = merged_pkg[0]
                 payload_vals = merged_pkg[1:-1]
                 buf          = bytearray([header])
-                for v in payload_vals:
-                    v32 = v & 0xFFFFFFFF
-                    buf.extend((v32 & 0xFFFF).to_bytes(2, "little"))
-                    buf.extend(((v32 >> 16) & 0xFFFF).to_bytes(2, "little"))
+                # for v in payload_vals:
+                #     v32 = v & 0xFFFFFFFF
+                #     buf.extend((v32 & 0xFFFF).to_bytes(2, "little"))
+                #     buf.extend(((v32 >> 16) & 0xFFFF).to_bytes(2, "little"))
 
                 try:
                     ser = self.serial_walk
@@ -1125,6 +1270,7 @@ class Motionpackage(Node):
 
                     written = ser.write(buf)
                     ser.flush()
+                    self.send_hand(handpkg)
                     self.get_logger().debug(f"[OpenCR] Sent {written} bytes: {list(buf)}")
                     acks = []
                     while True:
@@ -1144,19 +1290,21 @@ class Motionpackage(Node):
                     self.get_logger().debug(f"{header} Execute is finish! ACK={self.execut_ack.data}")
                     return
             return
+        handpkg,merged_pkg = self.load_packets_from_toml()
         header       = merged_pkg[0]
-        payload_vals = merged_pkg[1:-1]
-        buf          = bytearray([header])
-        for v in payload_vals:
-            v32 = v & 0xFFFFFFFF
-            buf.extend((v32 & 0xFFFF).to_bytes(2, "little"))
-            buf.extend(((v32 >> 16) & 0xFFFF).to_bytes(2, "little"))
+        # payload_vals = merged_pkg[1:-1]
+        buf          = merged_pkg #bytearray([header])
+        # for v in payload_vals:
+        #     v32 = v & 0xFFFFFFFF
+        #     buf.extend((v32 & 0xFFFF).to_bytes(2, "little"))
+        #     buf.extend(((v32 >> 16) & 0xFFFF).to_bytes(2, "little"))
         try:
             ser = self.serial_walk
             ser.reset_input_buffer()
             ser.timeout = 0.1
             written = ser.write(buf)
             ser.flush()
+            self.send_hand(handpkg)
             self.get_logger().debug(f"[OpenCR] Sent {written} bytes: {list(buf)}")
             acks = []
             while True:
@@ -1178,7 +1326,7 @@ class Motionpackage(Node):
 def main():
     rclpy.init()
     motion = Motionpackage()
-    motion.RobotisListinit()
+    # motion.RobotisListinit()
     rclpy.spin(motion)
 
 if __name__ == "__main__":

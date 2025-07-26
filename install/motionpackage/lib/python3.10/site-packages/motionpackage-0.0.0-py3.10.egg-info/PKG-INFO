@@ -1,0 +1,11 @@
+Metadata-Version: 2.1
+Name: motionpackage
+Version: 0.0.0
+Summary: TODO: Package description
+Maintainer: iclab
+Maintainer-email: iclab@todo.todo
+License: Apache-2.0
+License-File: LICENSE
+Requires-Dist: setuptools
+Provides-Extra: test
+Requires-Dist: pytest; extra == "test"

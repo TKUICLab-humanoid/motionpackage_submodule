@@ -1,0 +1,5 @@
+  File "/workspace/towen/src/motionpackage/install/motionpackage/lib/python3.10/site-packages/motionpackage/motion_0725.py", line 427
+    self.get_logger().debug(f"{"\033[93m"}Begin serial ini")
+                                 ^
+SyntaxError: unexpected character after line continuation character
+
