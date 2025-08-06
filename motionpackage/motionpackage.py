@@ -115,7 +115,7 @@ class Motionpackage(Node):
         self.serial_motor = False
         self.dio_tmpstatus = 0
         self.walkdata_receive = False
-        
+        self.walk_status = 0
         self.SendSectorPackage = []
         self.packageMotorData = []
         self.checkSectorPackage = []
@@ -140,6 +140,231 @@ class Motionpackage(Node):
         self.location = f"/workspace/towen/src/strategy/strategy/{loc}/Parameter"
         self.get_logger().info(f"Location :{self.location}")
 
+    # def LoadingWalkingGaitFunction(self, request, response):
+    #     print(f"Mode: {request.mode}")
+    #     if request.mode == 0:
+    #         if self.back_falg:
+    #             self.path = f"{self.location}/Continuous_Back.ini"
+    #             print(f"Path: {self.path}")
+    #         else:
+    #             self.path = f"{self.location}/{'Continuous_Parameter.ini'}"
+    #             print(f"Path: {self.path}")
+    #         config = configparser.ConfigParser()
+    #         config.read(self.path)
+    #         general = config["General"]
+
+    #         # 初始化儲存字典
+    #         self.gait_params = {
+    #             "com_y_swing":      float   (general["com_y_swing"]     ),
+    #             "y_swing_range":    float   (general["Y_Swing_Range"]   ),
+    #             "period_t":         int     (general["Period_T"]        ),
+    #             "osc_lockrange":    float   (general["OSC_LockRange"]   ),
+    #             "base_default_z":   float   (general["BASE_Default_Z"]  ),
+    #             "now_stand_height": float   (general["now_stand_height"]),
+    #             "now_com_height":   float   (general["now_com_height"]  ),
+    #             "stand_balance":    bool    (general["Stand_Balance"]   )
+    #         }
+
+    #         # 使用字典自動設定回傳值
+    #         for key, value in self.gait_params.items():
+    #             setattr(response, key, value)
+            
+    #         print(f"Response: {response}")
+    #         self.SendtoOpenCR(Bool(data=True))
+
+    #     elif request.mode == 3:
+    #         self.path = f"{self.location}/Single_Parameter.ini"
+    #         config = configparser.ConfigParser()
+    #         config.read(self.path)
+    #         general = config["General"]
+    #         # 讀取參數
+    #         response.x_swing_range = float(general["X_Swing_Range"])
+    #         response.y_swing_range = float(general["Y_Swing_Range"])
+    #         response.z_swing_range = float(general["Z_Swing_Range"])
+    #         response.period_t = int(general["Period_T"])
+    #         response.period_t2 = int(general["Period_T2"])
+    #         response.sample_time = int(general["Sample_Time"])
+    #         response.osc_lockrange = float(general["OSC_LockRange"])
+    #         response.base_default_z = float(general["BASE_Default_Z"])
+    #         response.x_swing_com = float(general["X_Swing_COM"])
+    #         response.base_lift_z = float(general["BASE_LIFT_Z"])
+    #         response.rightfoot_shift_z = float(general["rightfoot_shift_z"])
+    #         response.com_y_swing = float(general["com_y_swing"])
+    #         response.now_stand_height = float(general["now_stand_height"])
+    #         response.now_com_height = float(general["now_com_height"])
+    #         response.stand_balance = bool(general["Stand_Balance"])
+    #         print(f"Response: {response}")
+
+    #     elif request.mode in [1, 2]:
+    #         self.path = f"{self.location}/{'LCdown_Parameter.ini' if request.mode == 2 else 'LCstep_Parameter.ini'}"
+    #         config = configparser.ConfigParser()
+    #         config.read(self.path)
+    #         general = config["General"]
+    #         # 讀取參數
+    #         response.x_swing_range = float(general["X_Swing_Range"])
+    #         response.y_swing_range = float(general["Y_Swing_Range"])
+    #         response.z_swing_range = float(general["Z_Swing_Range"])
+    #         response.period_t = int(general["Period_T"])
+    #         response.period_t2 = int(general["Period_T2"])
+    #         response.sample_time = int(general["Sample_Time"])
+    #         response.osc_lockrange = float(general["OSC_LockRange"])
+    #         response.base_default_z = float(general["BASE_Default_Z"])
+    #         response.x_swing_com = float(general["X_Swing_COM"])
+    #         response.com_y_swing = float(general["Y_Swing_Shift"])
+    #         response.base_lift_z = float(general["BASE_LIFT_Z"])
+    #         response.com_y_swing = float(general["com_y_swing"])
+    #         response.now_stand_height = float(general["now_stand_height"])
+    #         response.now_com_height = float(general["now_com_height"])
+    #         response.stand_balance = bool(general["Stand_Balance"])
+    #         print(f"Response: {response}")
+
+    #     return response
+
+    # def SaveWalkingGaitFunction(self, msg):
+    #     print("SaveWalkingGaitFunction")
+    #     print(f"Mode: {msg.mode}")
+    #     if msg.mode == 0:
+    #         if self.back_falg:
+    #             self.path = f"{self.location}/{'Continuous_Back.ini'}"
+    #             config = configparser.ConfigParser()
+    #             config["General"] = {
+    #                 "com_y_swing": msg.com_y_swing,
+    #                 "Y_Swing_Range": msg.y_swing_range,
+    #                 "Period_T": msg.period_t,
+    #                 "OSC_LockRange": msg.osc_lockrange,
+    #                 "BASE_Default_Z": msg.base_default_z,
+    #                 "now_stand_height": msg.now_stand_height,
+    #                 "now_com_height": msg.now_com_height,
+    #                 "Stand_Balance": msg.stand_balance
+    #             }
+    #             with open(self.path, 'w') as f:
+    #                 config.write(f)
+    #         else:
+    #             self.path = f"{self.location}/{'Continuous_Parameter.ini'}"
+    #             config = configparser.ConfigParser()
+    #             config["General"] = {
+    #                 "com_y_swing": msg.com_y_swing,
+    #                 "Y_Swing_Range": msg.y_swing_range,
+    #                 "Period_T": msg.period_t,
+    #                 "OSC_LockRange": msg.osc_lockrange,
+    #                 "BASE_Default_Z": msg.base_default_z,
+    #                 "now_stand_height": msg.now_stand_height,
+    #                 "now_com_height": msg.now_com_height,
+    #                 "Stand_Balance": msg.stand_balance
+    #             }
+    #             with open(self.path, 'w') as f:
+    #                 config.write(f)
+    #     elif msg.mode == 3:
+    #         self.path = f"{self.location}/Single_Parameter.ini"
+    #         config = configparser.ConfigParser()
+    #         config["General"] = {
+    #             "com_y_swing": msg.com_y_swing,
+    #             "Y_Swing_Range": msg.y_swing_range,
+    #             "Period_T": msg.period_t,
+    #             "OSC_LockRange": msg.osc_lockrange,
+    #             "BASE_Default_Z": msg.base_default_z,
+    #             "now_stand_height": msg.now_stand_height,
+    #             "now_com_height": msg.now_com_height,
+    #             "Stand_Balance": msg.stand_balance
+    #         }
+    #         with open(self.path, 'w') as f:
+    #             config.write(f)
+    #     elif msg.mode in [1, 2]:
+    #         self.path = f"{self.location}/{'LCdown_Parameter.ini' if msg.mode == 2 else 'LCstep_Parameter.ini'}"
+    #         config = configparser.ConfigParser()
+    #         config["General"] = {
+    #             "X_Swing_Range": msg.x_swing_range,
+    #             "Y_Swing_Range": msg.y_swing_range,
+    #             "Z_Swing_Range": msg.z_swing_range,
+    #             "Period_T": msg.period_t,
+    #             "Period_T2": msg.period_t2,
+    #             "Sample_Time": msg.sample_time,
+    #             "OSC_LockRange": msg.osc_lockrange,
+    #             "BASE_Default_Z": msg.base_default_z,
+    #             "X_Swing_COM": msg.x_swong_com,
+    #             "Y_Swing_Shift": msg.y_swing_shift,
+    #             "BASE_LIFT_Z": msg.base_lift_z,
+    #             "com_y_swing": msg.com_y_swing,
+    #             "now_stand_height": msg.now_stand_height,
+    #             "now_com_height": msg.now_com_height,
+    #             "Stand_Balance": msg.stand_balance
+    #         }
+    #         with open(self.path, 'w') as f:
+    #             config.write(f)
+   
+    # def ChangeContinuousValueFunction(self, msg):
+    #     print("ChangeContinuousValueFunction")
+    #     # 注意这里是 B3fB，不是 8：
+    #     packet = struct.pack('<B3fB', 0x47, msg.x, msg.y, msg.theta, 0x45)
+    #     print(packet)
+
+    #     # 丢掉旧 ACK
+    #     self.serial_walk.reset_input_buffer()
+    #     # 发送并 flush
+    #     self.serial_walk.write(packet)
+    #     self.serial_walk.flush()
+    #     line = self.serial_walk.readline().decode('utf-8', errors='ignore').strip()
+    #     print(f"ACK raw: {line}")
+
+    # #################################################################
+    # def ContinousbackFunction(self, msg):
+    #     print("Continuousback")
+    #     self.back_falg = msg.data
+    # #################################################################
+
+    # def GerenteFunction(self, msg):
+    #     print(f"Gerente: {msg.data}")
+    #     packet = bytes([0x49, msg.data & 0xFF, 0x45])
+
+    #     # 丢掉上一次残留
+    #     self.serial_walk.reset_input_buffer()
+
+    #     # 写包并 flush
+    #     self.serial_walk.write(packet)
+    #     self.serial_walk.flush()
+    #     print(f"Packet Length: {len(packet)}")
+    #     print(f"Packet: {packet}")
+
+    #     line = self.serial_walk.readline().decode("utf-8").strip()
+    #     print(f"ACK raw: {line}")
+
+    # def SendtoOpenCR(self, msg):
+    #     if not self.gait_params:
+    #         print("尚未載入 gait_params，請先呼叫 LoadingWalkingGaitFunction")
+    #         return
+    #     if not msg.data:
+    #         return
+
+    #     print("SendtoOpenCR")
+
+    #     # 組 packet
+    #     p = self.gait_params
+    #     packet = struct.pack(
+    #         '<B7f?B',
+    #         0x48,
+    #         p["com_y_swing"],
+    #         p["y_swing_range"],
+    #         float(p["period_t"]),
+    #         p["osc_lockrange"],
+    #         p["base_default_z"],
+    #         p["now_stand_height"],
+    #         p["now_com_height"],
+    #         p["stand_balance"],
+    #         0x45
+    #     )
+
+    #     # 1) 丟掉殘留
+    #     self.serial_walk.reset_input_buffer()
+
+    #     # 2) 寫入並 flush
+    #     self.serial_walk.write(packet)
+    #     self.serial_walk.flush()
+    #     print(f"Packet Length: {len(packet)}")
+    #     print(f"Packet: {packet}")
+
+    #     # 3) 讀 ACK
+    #     line = self.serial_walk.readline().decode("utf-8").strip()
+    #     print(f"ACK raw: {line}")
     def LoadingWalkingGaitFunction(self, request, response):
         print(f"Mode: {request.mode}")
         if request.mode == 0:
@@ -162,7 +387,9 @@ class Motionpackage(Node):
                 "base_default_z":   float   (general["BASE_Default_Z"]  ),
                 "now_stand_height": float   (general["now_stand_height"]),
                 "now_com_height":   float   (general["now_com_height"]  ),
-                "stand_balance":    bool    (general["Stand_Balance"]   )
+                "stand_balance":    bool    (general["Stand_Balance"]   ),
+                "hip_roll":         float   (general["Hip_roll"]        ),
+                "ankle_roll":       float   (general["Ankle_roll"]      )
             }
 
             # 使用字典自動設定回傳值
@@ -200,23 +427,26 @@ class Motionpackage(Node):
             config = configparser.ConfigParser()
             config.read(self.path)
             general = config["General"]
-            # 讀取參數
-            response.x_swing_range = float(general["X_Swing_Range"])
-            response.y_swing_range = float(general["Y_Swing_Range"])
-            response.z_swing_range = float(general["Z_Swing_Range"])
-            response.period_t = int(general["Period_T"])
-            response.period_t2 = int(general["Period_T2"])
-            response.sample_time = int(general["Sample_Time"])
-            response.osc_lockrange = float(general["OSC_LockRange"])
-            response.base_default_z = float(general["BASE_Default_Z"])
-            response.x_swing_com = float(general["X_Swing_COM"])
-            response.com_y_swing = float(general["Y_Swing_Shift"])
-            response.base_lift_z = float(general["BASE_LIFT_Z"])
-            response.com_y_swing = float(general["com_y_swing"])
-            response.now_stand_height = float(general["now_stand_height"])
-            response.now_com_height = float(general["now_com_height"])
-            response.stand_balance = bool(general["Stand_Balance"])
+            # 初始化儲存字典
+            self.gait_params = {
+                "com_y_swing":      float   (general["com_y_swing"]     ),
+                "y_swing_range":    float   (general["Y_Swing_Range"]   ),
+                "period_t":         int     (general["Period_T"]        ),
+                "osc_lockrange":    float   (general["OSC_LockRange"]   ),
+                "base_default_z":   float   (general["BASE_Default_Z"]  ),
+                "base_lift_z":      float   (general["Board_High"]      ),
+                "now_stand_height": float   (general["now_stand_height"]),
+                "now_com_height":   float   (general["now_com_height"]  ),
+                "stand_balance":    bool    (general["Stand_Balance"]   ),
+                "hip_roll":         float   (general["Hip_roll"]        ),
+                "ankle_roll":       float   (general["Ankle_roll"]      )
+            }
+            # 使用字典自動設定回傳值
+            for key, value in self.gait_params.items():
+                setattr(response, key, value)
             print(f"Response: {response}")
+            self.SendtoOpenCR(Bool(data=True))
+
 
         return response
 
@@ -224,6 +454,7 @@ class Motionpackage(Node):
         print("SaveWalkingGaitFunction")
         print(f"Mode: {msg.mode}")
         if msg.mode == 0:
+            self.walk_status = 0
             if self.back_falg:
                 self.path = f"{self.location}/{'Continuous_Back.ini'}"
                 config = configparser.ConfigParser()
@@ -235,7 +466,9 @@ class Motionpackage(Node):
                     "BASE_Default_Z": msg.base_default_z,
                     "now_stand_height": msg.now_stand_height,
                     "now_com_height": msg.now_com_height,
-                    "Stand_Balance": msg.stand_balance
+                    "Stand_Balance": msg.stand_balance,
+                    "Hip_roll": msg.hip_roll,
+                    "Ankle_roll": msg.ankle_roll
                 }
                 with open(self.path, 'w') as f:
                     config.write(f)
@@ -250,11 +483,14 @@ class Motionpackage(Node):
                     "BASE_Default_Z": msg.base_default_z,
                     "now_stand_height": msg.now_stand_height,
                     "now_com_height": msg.now_com_height,
-                    "Stand_Balance": msg.stand_balance
+                    "Stand_Balance": msg.stand_balance,
+                    "Hip_roll": msg.hip_roll,
+                    "Ankle_roll": msg.ankle_roll
                 }
                 with open(self.path, 'w') as f:
                     config.write(f)
         elif msg.mode == 3:
+            self.walk_status = 3
             self.path = f"{self.location}/Single_Parameter.ini"
             config = configparser.ConfigParser()
             config["General"] = {
@@ -265,30 +501,31 @@ class Motionpackage(Node):
                 "BASE_Default_Z": msg.base_default_z,
                 "now_stand_height": msg.now_stand_height,
                 "now_com_height": msg.now_com_height,
-                "Stand_Balance": msg.stand_balance
+                "Stand_Balance": msg.stand_balance,
+                "Hip_roll": msg.hip_roll,
+                "Ankle_roll": msg.ankle_roll
             }
             with open(self.path, 'w') as f:
                 config.write(f)
         elif msg.mode in [1, 2]:
             self.path = f"{self.location}/{'LCdown_Parameter.ini' if msg.mode == 2 else 'LCstep_Parameter.ini'}"
+            self.walk_status = 2 if msg.mode == 2 else 1
+
             config = configparser.ConfigParser()
             config["General"] = {
-                "X_Swing_Range": msg.x_swing_range,
+                "com_y_swing": msg.com_y_swing,
                 "Y_Swing_Range": msg.y_swing_range,
-                "Z_Swing_Range": msg.z_swing_range,
                 "Period_T": msg.period_t,
-                "Period_T2": msg.period_t2,
-                "Sample_Time": msg.sample_time,
                 "OSC_LockRange": msg.osc_lockrange,
                 "BASE_Default_Z": msg.base_default_z,
-                "X_Swing_COM": msg.x_swong_com,
-                "Y_Swing_Shift": msg.y_swing_shift,
-                "BASE_LIFT_Z": msg.base_lift_z,
-                "com_y_swing": msg.com_y_swing,
+                "Board_High": msg.base_lift_z,
                 "now_stand_height": msg.now_stand_height,
                 "now_com_height": msg.now_com_height,
-                "Stand_Balance": msg.stand_balance
+                "Stand_Balance": msg.stand_balance,
+                "Hip_roll": msg.hip_roll,
+                "Ankle_roll": msg.ankle_roll
             }
+
             with open(self.path, 'w') as f:
                 config.write(f)
    
@@ -336,36 +573,85 @@ class Motionpackage(Node):
             return
 
         print("SendtoOpenCR")
-
-        # 組 packet
         p = self.gait_params
-        packet = struct.pack(
-            '<B7f?B',
-            0x48,
-            p["com_y_swing"],
-            p["y_swing_range"],
-            float(p["period_t"]),
-            p["osc_lockrange"],
-            p["base_default_z"],
-            p["now_stand_height"],
-            p["now_com_height"],
-            p["stand_balance"],
-            0x45
-        )
+        # 組 packet
+        if self.walk_status == 0:
+            packet = struct.pack(
+                '<B9f?B',
+                0x48,
+                p["com_y_swing"],
+                p["y_swing_range"],
+                float(p["period_t"]),
+                p["osc_lockrange"],
+                p["base_default_z"],
+                p["now_stand_height"],
+                p["now_com_height"],
+                p["hip_roll"],
+                p["ankle_roll"],
+                p["stand_balance"],
+                0x45
+            )
+        elif self.walk_status == 1:
+            packet = struct.pack(
+                '<B10f?B',
+                0x46,
+                p["com_y_swing"],
+                p["y_swing_range"],
+                float(p["period_t"]),
+                p["osc_lockrange"],
+                p["base_default_z"],
+                p["base_lift_z"],
+                p["now_stand_height"],
+                p["now_com_height"],
+                p["now_stand_height"],
+                p["hip_roll"],
+                p["ankle_roll"],
+                0x45
+            )
+        elif self.walk_status == 2:
+            packet = struct.pack(
+                '<B10f?B',
+                0x50,
+                p["com_y_swing"],
+                p["y_swing_range"],
+                float(p["period_t"]),
+                p["osc_lockrange"],
+                p["base_default_z"],
+                p["base_lift_z"],
+                p["now_stand_height"],
+                p["now_com_height"],
+                p["now_stand_height"],
+                p["hip_roll"],
+                p["ankle_roll"],
+                0x45
+            )
 
-        # 1) 丟掉殘留
+        # 清 input buffer 避免殘留
         self.serial_walk.reset_input_buffer()
 
-        # 2) 寫入並 flush
+        # 寫入
         self.serial_walk.write(packet)
         self.serial_walk.flush()
         print(f"Packet Length: {len(packet)}")
-        print(f"Packet: {packet}")
+        print(f"Packet (hex): {packet.hex()}")
 
-        # 3) 讀 ACK
-        line = self.serial_walk.readline().decode("utf-8").strip()
-        print(f"ACK raw: {line}")
+        # 等待 ACK，loop + timeout（例如 150ms）
+        ack = None
+        deadline = time.time() + 0.15
+        while time.time() < deadline:
+            line = self.serial_walk.readline()
+            if line:
+                try:
+                    ack = line.decode("utf-8", errors="ignore").strip()
+                except Exception:
+                    ack = line.decode("latin1", errors="ignore").strip()
+                break
+            time.sleep(0.005)  # small backoff
 
+        if ack:
+            self.get_logger().info(f"ACK raw: {ack}")
+        else:
+            self.get_logger().info("ACK timeout / empty response")
     def RobotisListinit(self):
         self.robotislist.clear()
         self.robotislistH.clear()
@@ -467,7 +753,7 @@ class Motionpackage(Node):
 
         # --- HEAD (Dynamixel via U2D2) ---
         # 只保留 device path，不用 serial.Serial
-        self.port_head_dev = '/dev/ttyUSB0'
+        self.port_head_dev = '/dev/ttyUSB1'
         self.baudrate_head = 1_000_000
 
         try:
@@ -519,7 +805,7 @@ class Motionpackage(Node):
             self.groupwrite      = None
 
 
-        self.port_waist_dev = '/dev/ttyUSB1'
+        self.port_waist_dev = '/dev/ttyUSB0'
         self.baudrate_head = 1_000_000
         try:
             self.get_logger().debug(
@@ -1365,7 +1651,7 @@ class Motionpackage(Node):
                     ser.reset_input_buffer()
                     ser.timeout = 0.1
 
-                    written = ser.write(buf)
+                    written = ser.write(merged_pkg)
                     ser.flush()
                     self.send_hand(handpkg)
                     self.send_waist(handpkg)
