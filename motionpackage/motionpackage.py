@@ -1728,11 +1728,15 @@ class Motionpackage(Node):
 # execute sector functions #
 ############################
                 
-def main():
-    rclpy.init()
+def main(args=None):
+    rclpy.init(args=args)
     motion = Motionpackage()
     # motion.RobotisListinit()
     rclpy.spin(motion)
-
-if __name__ == "__main__":
-    main()
+    try:
+        rclpy.spin(motion)
+    finally:
+        motion.destroy_node()
+        rclpy.shutdown()
+# if __name__ == "__main__":
+#     main()
