@@ -8,7 +8,7 @@ import rclpy.logging
 from std_msgs.msg import Int16,Bool
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
-from tku_msgs.msg import SensorPackage,SensorSet,HeadPackage,InterfaceSend2Sector,SaveMotion,SaveMotionVector,Location,Parametermessage,Interface,Dio,SingleMotorData
+from tku_msgs.msg import SensorPackage,SensorSet,HeadPackage,InterfaceSend2Sector,SaveMotion,SaveMotionVector,Location,Parametermessage,Interface,Dio,SingleMotorData,ButtonColorForm
 from tku_msgs.srv import ReadMotion,CheckSector,WalkingGaitParameter
 import rclpy
 from collections import namedtuple
@@ -100,6 +100,8 @@ class Motionpackage(Node):
         self.Gerente
         self.Send = self.create_subscription(Bool, '/Send_parameter', self.SendtoOpenCR, 1000)
         self.Send
+        self.torque_sub = self.create_subscription(ButtonColorForm, '/ColorModelForm_Topic', self.Torque, 1000)
+        self.torque_sub
 
         self.SingleMotor_sub = self.create_subscription(SingleMotorData, '/package/SingleMotorData',self.move_single_motor,1000)
         self.SingleMotor_sub
@@ -667,6 +669,24 @@ class Motionpackage(Node):
         
         # self.get_logger().info(f"hand {list(self.robotislistH)},head {list(self.robotislist)}")
 
+    def Torque(self, msg):
+        self.get_logger().info(f"torque")
+        if msg.buildingmodel:
+            for dxl_id in DXL_HEAD_IDS:
+                res, err = self.packet_handler_1.write1ByteTxRx(
+                    self.port_handler_1,
+                    dxl_id,
+                    ADDR_PRO_TORQUE_ENABLE,
+                    TORQUE_ENABLE
+                )
+                if res != COMM_SUCCESS:
+                    # self.get_logger().error(
+                    #     f"[ID:{dxl_id}] Enable torque failed: "
+                    #     f"{self.packet_handler.getTxRxResult(res)}"
+                    # )
+                    pass
+
+
     def HeadMotorFunction(self, msg):
         # 1. 更新本地的 robotislist
         motor = self.robotislist[msg.id - 1]
@@ -675,20 +695,20 @@ class Motionpackage(Node):
                             speed=msg.speed)
         self.robotislist[msg.id - 1] = updated_motor
 
-        # 2. 確保每顆馬達 torque 已打開
-        for m in self.robotislist:
-            res, err = self.packet_handler_1.write1ByteTxRx(
-                self.port_handler_1,
-                m.ID,
-                ADDR_PRO_TORQUE_ENABLE,
-                TORQUE_ENABLE
-            )
-            if res != COMM_SUCCESS:
-                # self.get_logger().error(
-                #     f"[ID:{m.ID}] Enable torque failed: "
-                #     f"{self.packet_handler.getTxRxResult(res)}"
-                # )
-                pass
+        # # 2. 確保每顆馬達 torque 已打開
+        # for m in self.robotislist:
+        #     res, err = self.packet_handler_1.write1ByteTxRx(
+        #         self.port_handler_1,
+        #         m.ID,
+        #         ADDR_PRO_TORQUE_ENABLE,
+        #         TORQUE_ENABLE
+        #     )
+        #     if res != COMM_SUCCESS:
+        #         # self.get_logger().error(
+        #         #     f"[ID:{m.ID}] Enable torque failed: "
+        #         #     f"{self.packet_handler.getTxRxResult(res)}"
+        #         # )
+        #         pass
 
         # 3. 清空上一次的群組參數
         self.groupwrite_1.clearParam()
@@ -753,7 +773,7 @@ class Motionpackage(Node):
 
         # --- HEAD (Dynamixel via U2D2) ---
         # 只保留 device path，不用 serial.Serial
-        self.port_head_dev = '/dev/ttyUSB1'
+        self.port_head_dev = '/dev/ttyUSB0'
         self.baudrate_head = 1_000_000
 
         try:
@@ -805,7 +825,7 @@ class Motionpackage(Node):
             self.groupwrite      = None
 
 
-        self.port_waist_dev = '/dev/ttyUSB0'
+        self.port_waist_dev = '/dev/ttyUSB1'
         self.baudrate_head = 1_000_000
         try:
             self.get_logger().debug(

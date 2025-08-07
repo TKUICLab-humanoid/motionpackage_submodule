@@ -1,0 +1,26 @@
+running egg_info
+writing build/motionpackage/motionpackage.egg-info/PKG-INFO
+writing dependency_links to build/motionpackage/motionpackage.egg-info/dependency_links.txt
+writing entry points to build/motionpackage/motionpackage.egg-info/entry_points.txt
+writing requirements to build/motionpackage/motionpackage.egg-info/requires.txt
+writing top-level names to build/motionpackage/motionpackage.egg-info/top_level.txt
+reading manifest file 'build/motionpackage/motionpackage.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'build/motionpackage/motionpackage.egg-info/SOURCES.txt'
+running build
+running build_py
+copying motionpackage/motion_0725.py -> /workspace/towen/src/motionpackage/build/motionpackage/build/lib/motionpackage
+copying motionpackage/motionpackage.py -> /workspace/towen/src/motionpackage/build/motionpackage/build/lib/motionpackage
+running install
+running install_lib
+copying /workspace/towen/src/motionpackage/build/motionpackage/build/lib/motionpackage/motion_0725.py -> /workspace/towen/src/motionpackage/install/motionpackage/lib/python3.10/site-packages/motionpackage
+copying /workspace/towen/src/motionpackage/build/motionpackage/build/lib/motionpackage/motionpackage.py -> /workspace/towen/src/motionpackage/install/motionpackage/lib/python3.10/site-packages/motionpackage
+byte-compiling /workspace/towen/src/motionpackage/install/motionpackage/lib/python3.10/site-packages/motionpackage/motion_0725.py to motion_0725.cpython-310.pyc
+byte-compiling /workspace/towen/src/motionpackage/install/motionpackage/lib/python3.10/site-packages/motionpackage/motionpackage.py to motionpackage.cpython-310.pyc
+running install_data
+running install_egg_info
+removing '/workspace/towen/src/motionpackage/install/motionpackage/lib/python3.10/site-packages/motionpackage-0.0.0-py3.10.egg-info' (and everything under it)
+Copying build/motionpackage/motionpackage.egg-info to /workspace/towen/src/motionpackage/install/motionpackage/lib/python3.10/site-packages/motionpackage-0.0.0-py3.10.egg-info
+running install_scripts
+Installing motionpackage script to /workspace/towen/src/motionpackage/install/motionpackage/lib/motionpackage
+writing list of installed files to '/workspace/towen/src/motionpackage/build/motionpackage/install.log'

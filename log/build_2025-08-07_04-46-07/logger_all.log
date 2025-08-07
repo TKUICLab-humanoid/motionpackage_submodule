@@ -1,0 +1,87 @@
+[0.327s] [34mcolcon[0m [1;30mDEBUG[0m [32mCommand line arguments: ['/usr/bin/colcon', 'build'][0m
+[0.327s] [34mcolcon[0m [1;30mDEBUG[0m [32mParsed command line arguments: Namespace(log_base=None, log_level=None, verb_name='build', build_base='build', install_base='install', merge_install=False, symlink_install=False, test_result_base=None, continue_on_error=False, executor='parallel', parallel_workers=6, event_handlers=None, ignore_user_meta=False, metas=['./colcon.meta'], base_paths=['.'], packages_ignore=None, packages_ignore_regex=None, paths=None, packages_up_to=None, packages_up_to_regex=None, packages_above=None, packages_above_and_dependencies=None, packages_above_depth=None, packages_select_by_dep=None, packages_skip_by_dep=None, packages_skip_up_to=None, packages_select_build_failed=False, packages_skip_build_finished=False, packages_select_test_failures=False, packages_skip_test_passed=False, packages_select=None, packages_skip=None, packages_select_regex=None, packages_skip_regex=None, packages_start=None, packages_end=None, cmake_args=None, cmake_target=None, cmake_target_skip_unavailable=False, cmake_clean_cache=False, cmake_clean_first=False, cmake_force_configure=False, ament_cmake_args=None, catkin_cmake_args=None, catkin_skip_building_tests=False, verb_parser=<colcon_defaults.argument_parser.defaults.DefaultArgumentsDecorator object at 0xffff84aba1d0>, verb_extension=<colcon_core.verb.build.BuildVerb object at 0xffff84a3df00>, main=<bound method BuildVerb.main of <colcon_core.verb.build.BuildVerb object at 0xffff84a3df00>>)[0m
+[0.442s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(colcon_meta) check parameters
+[0.442s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(recursive) check parameters
+[0.442s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(ignore) check parameters
+[0.442s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(path) check parameters
+[0.443s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(colcon_meta) discover
+[0.443s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(recursive) discover
+[0.443s] [34mcolcon.colcon_core.package_discovery[0m [1;30mINFO[0m Crawling recursively for packages in '/workspace/towen/src/motionpackage'
+[0.443s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extensions ['ignore', 'ignore_ament_install']
+[0.443s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extension 'ignore'
+[0.444s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extension 'ignore_ament_install'
+[0.444s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extensions ['colcon_pkg']
+[0.444s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extension 'colcon_pkg'
+[0.444s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extensions ['colcon_meta']
+[0.444s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extension 'colcon_meta'
+[0.444s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extensions ['ros']
+[0.444s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extension 'ros'
+[0.487s] [34mcolcon.colcon_core.package_identification[0m [1;30mDEBUG[0m [32mPackage '.' with type 'ros.ament_python' and name 'motionpackage'[0m
+[0.488s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(recursive) using defaults
+[0.488s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(ignore) discover
+[0.488s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(ignore) using defaults
+[0.488s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(path) discover
+[0.488s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(path) using defaults
+[0.529s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'motionpackage' build argument 'cmake_args' from command line to 'None'
+[0.530s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'motionpackage' build argument 'cmake_target' from command line to 'None'
+[0.530s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'motionpackage' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.530s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'motionpackage' build argument 'cmake_clean_cache' from command line to 'False'
+[0.530s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'motionpackage' build argument 'cmake_clean_first' from command line to 'False'
+[0.530s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'motionpackage' build argument 'cmake_force_configure' from command line to 'False'
+[0.530s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'motionpackage' build argument 'ament_cmake_args' from command line to 'None'
+[0.530s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'motionpackage' build argument 'catkin_cmake_args' from command line to 'None'
+[0.530s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'motionpackage' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.530s] [34mcolcon.colcon_core.verb[0m [1;30mDEBUG[0m [32mBuilding package 'motionpackage' with the following arguments: {'ament_cmake_args': None, 'build_base': '/workspace/towen/src/motionpackage/build/motionpackage', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/workspace/towen/src/motionpackage/install/motionpackage', 'merge_install': False, 'path': '/workspace/towen/src/motionpackage', 'symlink_install': False, 'test_result_base': None}[0m
+[0.531s] [34mcolcon.colcon_core.executor[0m [1;30mINFO[0m Executing jobs using 'parallel' executor
+[0.533s] [34mcolcon.colcon_parallel_executor.executor.parallel[0m [1;30mDEBUG[0m [32mrun_until_complete[0m
+[0.534s] [34mcolcon.colcon_ros.task.ament_python.build[0m [1;30mINFO[0m Building ROS package in '/workspace/towen/src/motionpackage' with build type 'ament_python'
+[0.534s] [34mcolcon.colcon_core.shell[0m [1;30mLevel 1[0m create_environment_hook('motionpackage', 'ament_prefix_path')
+[0.542s] [34mcolcon.colcon_core.plugin_system[0m [1;30mINFO[0m Skipping extension 'colcon_core.shell.bat': Not used on non-Windows systems
+[0.543s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment hook '/workspace/towen/src/motionpackage/install/motionpackage/share/motionpackage/hook/ament_prefix_path.ps1'
+[0.545s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment descriptor '/workspace/towen/src/motionpackage/install/motionpackage/share/motionpackage/hook/ament_prefix_path.dsv'
+[0.546s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment hook '/workspace/towen/src/motionpackage/install/motionpackage/share/motionpackage/hook/ament_prefix_path.sh'
+[0.548s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.548s] [34mcolcon.colcon_core.shell[0m [1;30mDEBUG[0m [32mSkip shell extension 'dsv' for command environment[0m
+[1.101s] [34mcolcon.colcon_core.task.python.build[0m [1;30mINFO[0m Building Python package in '/workspace/towen/src/motionpackage'
+[1.102s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[1.102s] [34mcolcon.colcon_core.shell[0m [1;30mDEBUG[0m [32mSkip shell extension 'dsv' for command environment[0m
+[2.959s] [34mcolcon.colcon_core.event_handler.log_command[0m [1;30mDEBUG[0m [32mInvoking command in '/workspace/towen/src/motionpackage': BYOBU_DATE=%Y-%m-%d PYTHONPATH=/workspace/towen/src/motionpackage/build/motionpackage/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/workspace/towen/src/motionpackage/install/motionpackage/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py egg_info --egg-base build/motionpackage build --build-base /workspace/towen/src/motionpackage/build/motionpackage/build install --record /workspace/towen/src/motionpackage/build/motionpackage/install.log --single-version-externally-managed install_data[0m
+[4.514s] [34mcolcon.colcon_core.event_handler.log_command[0m [1;30mDEBUG[0m [32mInvoked command in '/workspace/towen/src/motionpackage' returned '0': BYOBU_DATE=%Y-%m-%d PYTHONPATH=/workspace/towen/src/motionpackage/build/motionpackage/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/workspace/towen/src/motionpackage/install/motionpackage/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py egg_info --egg-base build/motionpackage build --build-base /workspace/towen/src/motionpackage/build/motionpackage/build install --record /workspace/towen/src/motionpackage/build/motionpackage/install.log --single-version-externally-managed install_data[0m
+[4.527s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m checking '/workspace/towen/src/motionpackage/install/motionpackage' for CMake module files
+[4.528s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m checking '/workspace/towen/src/motionpackage/install/motionpackage' for CMake config files
+[4.530s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m checking '/workspace/towen/src/motionpackage/install/motionpackage/lib'
+[4.530s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m checking '/workspace/towen/src/motionpackage/install/motionpackage/bin'
+[4.530s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m checking '/workspace/towen/src/motionpackage/install/motionpackage/lib/pkgconfig/motionpackage.pc'
+[4.531s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m checking '/workspace/towen/src/motionpackage/install/motionpackage/lib/python3.10/site-packages'
+[4.531s] [34mcolcon.colcon_core.shell[0m [1;30mLevel 1[0m create_environment_hook('motionpackage', 'pythonpath')
+[4.532s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment hook '/workspace/towen/src/motionpackage/install/motionpackage/share/motionpackage/hook/pythonpath.ps1'
+[4.535s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment descriptor '/workspace/towen/src/motionpackage/install/motionpackage/share/motionpackage/hook/pythonpath.dsv'
+[4.536s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment hook '/workspace/towen/src/motionpackage/install/motionpackage/share/motionpackage/hook/pythonpath.sh'
+[4.539s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m checking '/workspace/towen/src/motionpackage/install/motionpackage/bin'
+[4.539s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m create_environment_scripts_only(motionpackage)
+[4.540s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating package script '/workspace/towen/src/motionpackage/install/motionpackage/share/motionpackage/package.ps1'
+[4.544s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating package descriptor '/workspace/towen/src/motionpackage/install/motionpackage/share/motionpackage/package.dsv'
+[4.547s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating package script '/workspace/towen/src/motionpackage/install/motionpackage/share/motionpackage/package.sh'
+[4.551s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating package script '/workspace/towen/src/motionpackage/install/motionpackage/share/motionpackage/package.bash'
+[4.555s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating package script '/workspace/towen/src/motionpackage/install/motionpackage/share/motionpackage/package.zsh'
+[4.558s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m create_file_with_runtime_dependencies(/workspace/towen/src/motionpackage/install/motionpackage/share/colcon-core/packages/motionpackage)
+[4.560s] [34mcolcon.colcon_parallel_executor.executor.parallel[0m [1;30mDEBUG[0m [32mclosing loop[0m
+[4.561s] [34mcolcon.colcon_parallel_executor.executor.parallel[0m [1;30mDEBUG[0m [32mloop closed[0m
+[4.562s] [34mcolcon.colcon_parallel_executor.executor.parallel[0m [1;30mDEBUG[0m [32mrun_until_complete finished with '0'[0m
+[4.562s] [34mcolcon.colcon_core.event_reactor[0m [1;30mDEBUG[0m [32mjoining thread[0m
+[4.587s] [34mcolcon.colcon_core.plugin_system[0m [1;30mINFO[0m Skipping extension 'colcon_notification.desktop_notification.notify_send': Could not find 'notify-send'
+[4.587s] [34mcolcon.colcon_core.plugin_system[0m [1;30mINFO[0m Skipping extension 'colcon_notification.desktop_notification.terminal_notifier': Not used on non-Darwin systems
+[4.587s] [34mcolcon.colcon_core.plugin_system[0m [1;30mINFO[0m Skipping extension 'colcon_notification.desktop_notification.win32': Not used on non-Windows systems
+[4.587s] [34mcolcon.colcon_notification.desktop_notification[0m [1;30mINFO[0m Sending desktop notification using 'notify2'
+[4.595s] [34mcolcon.colcon_notification.desktop_notification.notify2[0m [1;30mDEBUG[0m [32mFailed to initialize notify2: org.freedesktop.DBus.Error.Spawn.ExecFailed: /usr/bin/dbus-launch terminated abnormally without any error message[0m
+[4.596s] [34mcolcon.colcon_core.event_reactor[0m [1;30mDEBUG[0m [32mjoined thread[0m
+[4.597s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix script '/workspace/towen/src/motionpackage/install/local_setup.ps1'
+[4.601s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix util module '/workspace/towen/src/motionpackage/install/_local_setup_util_ps1.py'
+[4.606s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix chain script '/workspace/towen/src/motionpackage/install/setup.ps1'
+[4.610s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix script '/workspace/towen/src/motionpackage/install/local_setup.sh'
+[4.611s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix util module '/workspace/towen/src/motionpackage/install/_local_setup_util_sh.py'
+[4.613s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix chain script '/workspace/towen/src/motionpackage/install/setup.sh'
+[4.617s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix script '/workspace/towen/src/motionpackage/install/local_setup.bash'
+[4.619s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix chain script '/workspace/towen/src/motionpackage/install/setup.bash'
+[4.624s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix script '/workspace/towen/src/motionpackage/install/local_setup.zsh'
+[4.627s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix chain script '/workspace/towen/src/motionpackage/install/setup.zsh'
