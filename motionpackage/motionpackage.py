@@ -8,7 +8,7 @@ import rclpy.logging
 from std_msgs.msg import Int16,Bool
 from rclpy.node import Node
 from rclpy.qos import QoSProfile
-from tku_msgs.msg import SensorPackage,SensorSet,HeadPackage,InterfaceSend2Sector,SaveMotion,SaveMotionVector,Location,Parametermessage,Interface,Dio,SingleMotorData,ButtonColorForm
+from tku_msgs.msg import SensorPackage,SensorSet,HeadPackage,InterfaceSend2Sector,SaveMotion,SaveMotionVector,Location,Parametermessage,Parameter,Interface,Dio,SingleMotorData,ButtonColorForm
 from tku_msgs.srv import ReadMotion,CheckSector,WalkingGaitParameter
 import rclpy
 from collections import namedtuple
@@ -105,6 +105,9 @@ class Motionpackage(Node):
 
         self.SingleMotor_sub = self.create_subscription(SingleMotorData, '/package/SingleMotorData',self.move_single_motor,1000)
         self.SingleMotor_sub
+
+        self.Sendparameter2openCR = self.create_subscription(Parameter, '/strategy/walkparameter', self.Send2OpenCR, 1000)
+        self.Sendparameter2openCR
         self.robotislist = []
         self.robotislistH = []
         self.robotislistW = []
@@ -654,6 +657,65 @@ class Motionpackage(Node):
             self.get_logger().info(f"ACK raw: {ack}")
         else:
             self.get_logger().info("ACK timeout / empty response")
+
+    def Send2OpenCR(self,msg):
+        print("~~~Send~~~")
+        self.gait_params = {
+            "com_y_swing":      float   (msg.com_y_swing     ),
+            "y_swing_range":    float   (msg.y_swing_range   ),
+            "period_t":         int     (msg.period_t        ),
+            "osc_lockrange":    float   (msg.osc_lockrange   ),
+            "base_default_z":   float   (msg.base_default_z  ),
+            "now_stand_height": float   (msg.now_stand_height),
+            "now_com_height":   float   (msg.now_com_height  ),
+            "stand_balance":    bool    (msg.stand_balance   ),
+            "hip_roll":         float   (msg.hip_roll        ),
+            "ankle_roll":       float   (msg.ankle_roll      )
+        }
+        p = self.gait_params
+        # 組 packet
+        packet = struct.pack(
+            '<B9f?B',
+            0x48,
+            p["com_y_swing"],
+            p["y_swing_range"],
+            float(p["period_t"]),
+            p["osc_lockrange"],
+            p["base_default_z"],
+            p["now_stand_height"],
+            p["now_com_height"],
+            p["hip_roll"],
+            p["ankle_roll"],
+            p["stand_balance"],
+            0x45
+        )
+        # 清 input buffer 避免殘留
+        self.serial_walk.reset_input_buffer()
+
+        # 寫入
+        self.serial_walk.write(packet)
+        self.serial_walk.flush()
+        print(f"Packet Length: {len(packet)}")
+        print(f"Packet (hex): {packet.hex()}")
+
+        # 等待 ACK，loop + timeout（例如 150ms）
+        ack = None
+        deadline = time.time() + 0.15
+        while time.time() < deadline:
+            line = self.serial_walk.readline()
+            if line:
+                try:
+                    ack = line.decode("utf-8", errors="ignore").strip()
+                except Exception:
+                    ack = line.decode("latin1", errors="ignore").strip()
+                break
+            time.sleep(0.005)  # small backoff
+
+        if ack:
+            self.get_logger().info(f"ACK raw: {ack}")
+        else:
+            self.get_logger().info("ACK timeout / empty response")
+
     def RobotisListinit(self):
         self.robotislist.clear()
         self.robotislistH.clear()
